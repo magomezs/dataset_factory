@@ -6,11 +6,13 @@ This repository contains two groups of functions in C++
 
 - data_factory_from_mot: generation of pairs, triplets and tracklets from Multi-object tracking datasets with the division of the samples in train, validation and test sets, according to the protocol described by described in [3].
 
-
 The outputs are data txt files with labels, suitable for blobs creation to train deep networks with caffe.
 
 <br />
+Then, there is a set of scripts to create the blobs from the datasets using the generated data files (with the previous functions)
+- blobs_creation: generate caffe data blobs
 
+<br />
 # Example of how to use data_factory_from_reid 
 This is an example of how to use data_factory_from_reid with PRID2011[1] and ViPER datasets[2].
 
