@@ -16,36 +16,22 @@ This is an example of how to use data_factory_from_reid with PRID2011[1] and ViP
 
 <br />
 
-string prid= "prid_dataset_directory" 
-
-get_samples(prid, 7,4);
-
-train_val_test_division(prid, 100, 100, 100, 10, 100, 649, 100);
-
-create_pair_data(prid, 100000, 10000, 1,4);
-
-create_triplet_data_fixed_cam(prid, 50000, 5000);
-
-create_triplet_data(prid, 50000, 5000);
-
-create_test_data(prid);
-
+string prid= "prid_dataset_directory" <br />
+get_samples(prid, 7,4);<br />
+train_val_test_division(prid, 100, 100, 100, 10, 100, 649, 100);<br />
+create_pair_data(prid, 100000, 10000, 1,4);<br />
+create_triplet_data_fixed_cam(prid, 50000, 5000);<br />
+create_triplet_data(prid, 50000, 5000);<br />
+create_test_data(prid);<br />
 <br />
 
-string viper= "viper_dataset_directory"
-
-get_samples(viper, 0, 3);
-
-train_val_test_division(viper, 316, 316, 316, 10, 316, 316, 316);
-
-create_pair_data(viper, 100000, 10000, 1,4);
-
-create_triplet_data(viper, 50000, 5000);
-
-create_triplet_data_fixed_cam(viper, 50000, 5000);
-
-create_test_data(viper);
-
+string viper= "viper_dataset_directory"<br />
+get_samples(viper, 0, 3);<br />
+train_val_test_division(viper, 316, 316, 316, 10, 316, 316, 316);<br />
+create_pair_data(viper, 100000, 10000, 1,4);<br />
+create_triplet_data(viper, 50000, 5000);<br />
+create_triplet_data_fixed_cam(viper, 50000, 5000);<br />
+create_test_data(viper);<br />
 <br />
 
 
