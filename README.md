@@ -35,7 +35,7 @@ create_test_data(viper);<br />
 <br />
 
 
-NOTE:be carefull with PRID samples whose identification number is higher than 200, because different people in cam a and b are labbelled with the same number, from id 200. Alternative solution: remove samples with ID higher than 200 in cam_a set, they are not neccesarry in the training and test described in [3].
+NOTE:be careful with PRID samples whose identification number is higher than 200, because different people in cam a and b are labbelled with the same number, from id 200. Alternative solution: remove samples with ID higher than 200 in cam_a set, they are not neccesarry in the training and test described in [3].
 
 <br />
 
@@ -46,3 +46,18 @@ NOTE:be carefull with PRID samples whose identification number is higher than 20
 [3]Hirzer, M., Beleznai, C., Roth, P. M., and Bischof, H. (2011). Person re-identification by descriptive and
 discriminative classification. In Scandinavian conference on Image analysis, pages 91–102. Springer.
 
+
+# Example of how to use data_factory_from_mot 
+This is an example of how to use data_factory_from_mot with the MOT17 datasets from multi-object tracking challenge [4].
+
+string mot= "mot_dataset_directory"<br />
+get_samples(mot, 0.7); <br />
+create_pair_data(mot, 500000, 50000, 16, 1, 0.9); <br />
+create_triplet_data(mot, 500000, 50000, 16, 1, 0.9); <br />
+create_tracklet_data(mot,  200000, 20000, 16, 16, 1, 0.9); <br />
+      
+<br />
+      
+[4] https://motchallenge.net/data/MOT17/
+      
+      
