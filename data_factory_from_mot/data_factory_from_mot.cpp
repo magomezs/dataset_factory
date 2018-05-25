@@ -39,7 +39,6 @@ void get_samples(string dataset_folder, float min_visibility){
           train_sequences_list.push_back(line);
     }
 
-
     //SAMPLES FOLDERS
     char samples_folder[150], train_samples_folder[150];
     strcpy(samples_folder, dataset_folder.c_str());
@@ -49,7 +48,6 @@ void get_samples(string dataset_folder, float min_visibility){
     int e=mkdir(samples_folder, ACCESSPERMS);
     int e_tr=mkdir(train_samples_folder, ACCESSPERMS);
 
-
     //SAMPLES LIST FILE (OUTPUT)
     char train_samples_list_file_name[150];
     strcpy(train_samples_list_file_name, train_samples_folder);
@@ -57,7 +55,6 @@ void get_samples(string dataset_folder, float min_visibility){
     ofstream train_samples_list_file(train_samples_list_file_name);
     if (!train_samples_list_file.is_open())
         cout<<"2. can not open "<<train_samples_list_file_name<<endl;
-
 
     int number=0;//SAMPLE NUMBER
 
@@ -102,7 +99,7 @@ void get_samples(string dataset_folder, float min_visibility){
         while ( std::getline (gt_file,linea))//   && count<50000 probe&&
         {
             number++;
-
+            
             //GET LINE OF GT
             std::stringstream ss;
             ss.str(linea);
@@ -145,7 +142,6 @@ void get_samples(string dataset_folder, float min_visibility){
             int conf=atoi(strs[6].c_str());
             int type=atoi(strs[7].c_str());
             float visibility=atoi(strs[8].c_str());
-
 
             //EXTRACT SAMPLE
             if (roi.width>0 && roi.height>0){
@@ -174,162 +170,8 @@ void get_samples(string dataset_folder, float min_visibility){
     }
     train_samples_list_file.close();
 
-
     cout<<"samples extraction done"<<endl;
 }
-
-
-void get_test_samples(string dataset_folder, float min_visibility){
-    //VECTOR WITH THE TEST SEQUENCES NAMES
-    char test_sequences_list_file[150];
-    strcpy(test_sequences_list_file, dataset_folder.c_str());
-    strcat(test_sequences_list_file, "/DATABASE/test/test_sequences_list.txt");
-    ifstream test_list(test_sequences_list_file);
-    if (!test_list.is_open())
-          cout<<"can not open " << test_sequences_list_file<<endl;
-    vector<string> test_sequences_list;
-    string line;
-    while (getline (test_list,line)) {
-          test_sequences_list.push_back(line);
-    }
-
-    //SAMPLES FOLDERS
-    char samples_folder[150], train_samples_folder[150], test_samples_folder[150];
-    strcpy(samples_folder, dataset_folder.c_str());
-    strcat(samples_folder, "/SAMPLES");
-    strcpy(test_samples_folder, samples_folder);
-    strcat(test_samples_folder, "/test");
-    int e=mkdir(samples_folder, ACCESSPERMS);
-    int e_tr=mkdir(train_samples_folder, ACCESSPERMS);
-    int e_te=mkdir(test_samples_folder, ACCESSPERMS);
-
-
-    //SAMPLES LIST FILE (OUTPUT)
-    char test_samples_list_file_name[150];
-    strcpy(test_samples_list_file_name, test_samples_folder);
-    ofstream test_samples_list_file("test_samples_list.txt");
-    if (!test_samples_list_file.is_open())
-        cout<<"can not open "<<test_samples_list_file_name<<endl;
-
-
-    int number=0;//SAMPLE NUMBER
-
-
-
-
-    //FOR LOOP (FOR EVERY TEST DATASET)
-    cout<<"Test samples extraction..."<<endl;
-    for(int d=0; d<test_sequences_list.size(); d++){
-        string sequence=test_sequences_list[d];
-        char gt_file_name[150], frames_folder[150], ds_samples_folder[150], frame_file_name[150], sample_file_name[150];
-
-        //SAMPLES LIST FILE (OUTPUT)
-        char ds_samples_list_name[150];
-        strcpy(ds_samples_list_name, test_samples_folder);
-        strcat(ds_samples_list_name, sequence.c_str());
-        strcat(ds_samples_list_name, "_samples_list.txt");
-        ofstream ds_samples_list_file(ds_samples_list_name);
-        if (!ds_samples_list_file.is_open())
-            cout<<"can not open "<<ds_samples_list_name<<endl;
-
-        //GT FILE
-        strcpy(gt_file_name, dataset_folder.c_str());
-        strcat(gt_file_name, "/DATABASE/test/");
-        strcat(gt_file_name, sequence.c_str());
-        strcat(gt_file_name, "/gt/gt.txt");
-        ifstream gt_file(gt_file_name);
-        if (!gt_file.is_open())
-        cout<<"can not open "<<gt_file_name<<endl;
-
-        //FRAMES FOLDER
-        strcpy(frames_folder, dataset_folder.c_str());
-        strcat(frames_folder, "/DATABASE/test/");
-        strcat(frames_folder ,sequence.c_str());
-        strcat(frames_folder, "/img1/");
-
-        //SAMPLES FOLDER (OUTPUT)
-        strcpy(ds_samples_folder, test_samples_folder);
-        strcat(ds_samples_folder, sequence.c_str());
-        e=mkdir(ds_samples_folder, ACCESSPERMS);
-
-        std::string linea;
-        while ( std::getline (gt_file,linea))//   && count<50000 probe&&
-        {
-            number++;
-
-            //GET LINE OF GT
-            std::stringstream ss;
-            ss.str(linea);
-            std::vector<std::string> strs;
-            boost::split(strs, linea, boost::is_any_of(", "));
-
-            //LOAD FRAME
-            string frame_name= "000000.jpg";
-            int frame_number=atoi(strs[0].c_str());
-            stringstream s1;
-            s1 << frame_number;
-            string fn = s1.str();
-            int size1=fn.size();
-            frame_name.replace(frame_name.end()-size1-4, frame_name.end()-4, fn);
-            strcpy(frame_file_name, frames_folder);
-            strcat(frame_file_name, frame_name.c_str());
-            Mat frame=imread(frame_file_name);
-            int max_width=frame.cols;
-            int max_height=frame.rows;
-
-            //ATTRIBUTES
-            int id=atoi(strs[1].c_str());
-            Rect roi;
-            roi.x=atoi(strs[2].c_str());
-            roi.y=atoi(strs[3].c_str());
-            roi.width=atoi(strs[4].c_str());
-            roi.height=atoi(strs[5].c_str());
-            if(roi.x<0){
-                roi.x=0;
-            }
-            if(roi.y<0){
-                roi.y=0;
-            }
-            if((roi.x+roi.width)>max_width){
-                roi.width=max_width-roi.x-1;
-            }
-            if((roi.y+roi.height)>max_height){
-                roi.height=max_height-roi.y-1;
-            }
-            int conf=atoi(strs[6].c_str());
-            int type=atoi(strs[7].c_str());
-            float visibility=atoi(strs[8].c_str());
-
-
-            //EXTRACT SAMPLE
-            if (roi.width>0 && roi.height>0){
-                Mat sample;
-                frame(roi).copyTo(sample);
-                string sample_name= "000000.png";
-                stringstream s2;
-                s2 << number;
-                string n = s2.str();
-                int size2=n.size();
-                sample_name.replace(sample_name.end()-size2-4, sample_name.end()-4, n);
-                strcpy(sample_file_name, ds_samples_folder);
-                strcat(sample_file_name, "/");
-                strcat(sample_file_name, sample_name.c_str());
-                imwrite(sample_file_name, sample);
-
-                //WRITE SAMPLES LIST
-                if (conf!=0 && visibility>min_visibility && (type==1 || type==7)){
-                    test_samples_list_file<<sequence<<"/"<<sample_name<<", "<<sequence<<", "<<frame_number<<", "<<id<<"\n";
-                    ds_samples_list_file<<sequence<<"/"<<sample_name<<", "<<sequence<<", "<<frame_number<<", "<<id<<"\n";
-                }
-            }
-        }
-        gt_file.close();
-        ds_samples_list_file.close();
-    }
-    test_samples_list_file.close();
-
-}
-
 
 
 void create_pair_data(string dataset_folder, int max_t_pairs, int max_v_pairs, int ts, int oversampling, float training_identities_ratio){
@@ -353,7 +195,6 @@ void create_pair_data(string dataset_folder, int max_t_pairs, int max_v_pairs, i
     strcat(samples_folder, "/SAMPLES");
     strcpy(train_samples_folder, samples_folder);
     strcat(train_samples_folder, "/train");
-
 
     //SAMPLES LIST FILE
     char samples_list_file_name[150];
@@ -459,7 +300,6 @@ void create_pair_data(string dataset_folder, int max_t_pairs, int max_v_pairs, i
             }
         }
 
-
         if(train_size>1){
             //TRAIN_A (OUTPUT)
             char train_a_file_name[150];
@@ -560,7 +400,6 @@ void create_pair_data(string dataset_folder, int max_t_pairs, int max_v_pairs, i
             if (!val_b_file.is_open())
                 cout<<"can not open val_b.txt"<<endl;
 
-
             //VAL PAIRS CREATION
             cout<<"Validation pairs creation..."<<endl;
             vector<vector<string> > val_pairs;
@@ -626,12 +465,9 @@ void create_pair_data(string dataset_folder, int max_t_pairs, int max_v_pairs, i
             cout<<"     Not enough identities to create val data"<<endl;
         }
 
-
     }else{
         cout<<"  Not enough identities to create data"<<endl;
     }
-
-
 }
 
 void create_triplet_data(string dataset_folder, int max_t_triplets, int max_v_triplets, int ts, int oversampling, float training_identities_ratio){
@@ -760,7 +596,6 @@ void create_triplet_data(string dataset_folder, int max_t_triplets, int max_v_tr
             }
         }
 
-
         if(train_size>1){
 
             //TRAIN_AN (OUTPUT)
@@ -786,8 +621,6 @@ void create_triplet_data(string dataset_folder, int max_t_triplets, int max_v_tr
             ofstream train_n_file(train_n_file_name);
             if (!train_n_file.is_open())
                 cout<<"can not open train_n.txt"<<endl;
-
-
 
             //TRAIN TRIPLETS CREATION
             cout<<"Training triplets creation..."<<endl;
@@ -877,7 +710,6 @@ void create_triplet_data(string dataset_folder, int max_t_triplets, int max_v_tr
             if (!val_n_file.is_open())
                 cout<<"can not open val_n.txt"<<endl;
 
-
             //VAL TRIPLETS CREATION
             cout<<"Validation triplets creation..."<<endl;
             vector<vector<string> > val_triplets;
@@ -941,15 +773,11 @@ void create_triplet_data(string dataset_folder, int max_t_triplets, int max_v_tr
             cout<<"     Not enough identities to create val data"<<endl;
         }
 
-
-
     }else{
         cout<<"  Not enough identities to create data"<<endl;
     }
-
-
-
 }
+
 void create_tracklet_data(string dataset_folder, int max_t_tracklets, int max_v_tracklets, int ts, int td, int oversampling, float training_identities_ratio){
     srand (time(NULL));
 
@@ -964,7 +792,6 @@ void create_tracklet_data(string dataset_folder, int max_t_tracklets, int max_v_
     strcpy(data_tracklet_folder, data_folder);
     strcat(data_tracklet_folder, "/TRACKLET");
     int eT=mkdir(data_tracklet_folder, ACCESSPERMS);
-
 
     //SAMPLES FOLDERS
     char samples_folder[150], train_samples_folder[150];
@@ -1077,7 +904,6 @@ void create_tracklet_data(string dataset_folder, int max_t_tracklets, int max_v_
             }
         }
 
-
         if(train_size>1){
             //OPEN OUTPUT FILES
             vector<shared_ptr<ofstream> > files;
@@ -1147,9 +973,7 @@ void create_tracklet_data(string dataset_folder, int max_t_tracklets, int max_v_
                                     }
                                 }
                             }
-
                         }
-
                     }
                 }
             }
@@ -1241,11 +1065,7 @@ void create_tracklet_data(string dataset_folder, int max_t_tracklets, int max_v_
                                     }
                                 }
                             }
-
                         }
-
-
-
                     }
                 }
             }
@@ -1273,192 +1093,3 @@ void create_tracklet_data(string dataset_folder, int max_t_tracklets, int max_v_
     }
 
 }
-
-
-
-
-
-void create_test_data(string dataset_folder, int max_t_pairs, int ts, int oversampling){
-    srand (time(NULL));
-
-    //DATA FOLDER
-    char data_folder[150];
-    strcpy(data_folder, dataset_folder.c_str());
-    strcat(data_folder, "/DATA");
-    int e=mkdir(data_folder, ACCESSPERMS);
-
-    //DATA PAIRS FOLDER
-    char data_pair_folder[150];
-    strcpy(data_pair_folder, data_folder);
-    strcat(data_pair_folder, "/PAIR");
-    int ePAIR=mkdir(data_pair_folder, ACCESSPERMS);
-
-    //SAMPLES FOLDERS
-    char samples_folder[150], train_samples_folder[150], test_samples_folder[150];
-    strcpy(samples_folder, dataset_folder.c_str());
-    strcat(samples_folder, "/SAMPLES");
-    strcat(test_samples_folder, samples_folder);
-    strcat(test_samples_folder, "/test");
-
-
-    //SAMPLES LIST FILE
-    char samples_list_file_name[150];
-    strcpy(samples_list_file_name, test_samples_folder);
-    ifstream samples_list_file("/test_samples_list.txt");
-    if (!samples_list_file.is_open())
-        cout<<"can not open "<<samples_list_file_name<<endl;
-
-    char samples_list_file_name_new[150];
-    strcpy(samples_list_file_name_new, data_folder);
-    ofstream samples_list_file_new("/test_samples_list.txt");
-    if (!samples_list_file_new.is_open())
-        cout<<"can not open "<<samples_list_file_name_new<<endl;
-
-    string line;
-    int max_id=0;
-    int previous_id=0;
-    int new_id=0;
-    int max_frame=0;
-    while ( std::getline (samples_list_file,line))//
-    {
-        std::stringstream ss;
-        ss.str(line);
-        std::vector<std::string> strs;
-        boost::split(strs, line, boost::is_any_of(","));
-        int frame=atoi(strs[2].c_str());
-        int id=atoi(strs[3].c_str());
-        if (id!=previous_id){
-            previous_id=id;
-            new_id++;
-        }
-        samples_list_file_new<<strs[0]<<","<<strs[1]<<","<<strs[2]<<", "<<new_id<<"\n";
-        if(new_id>max_id)
-            max_id=new_id;
-        if (frame>max_frame)
-            max_frame=frame;
-    }
-    samples_list_file.close();
-    samples_list_file_new.close();
-
-    if(max_id>1){
-        samples_list_file.open(samples_list_file_name_new);
-
-        //MATRIX WITH THE SAMPLES NAMES
-        vector<vector<string> > test_samples_matrix;
-        int height = max_id;
-        int width = max_frame;
-        test_samples_matrix.resize(height);
-        for(int i = 0; i < height; i++) test_samples_matrix[i].resize(width);
-        while ( std::getline (samples_list_file,line))
-        {
-            std::stringstream ss;
-            ss.str(line);
-            std::vector<std::string> strs;
-            boost::split(strs, line, boost::is_any_of(","));
-            int frame=atoi(strs[2].c_str());
-            int id=atoi(strs[3].c_str());
-            string label_a="0000";
-            stringstream s3;
-            s3 << id;
-            string idn = s3.str();
-            int size=idn.size();
-            label_a.replace(label_a.end()-size, label_a.end(), idn);
-            char sample[100];
-            strcpy(sample, strs[0].c_str());
-            strcat(sample, " ");
-            strcat(sample, label_a.c_str());
-            vector<string> row=test_samples_matrix[id-1];
-            row[frame-1]=sample;
-            test_samples_matrix[id-1]=row;
-        }
-
-
-
-            //test_A (OUTPUT)
-            char test_a_file_name[150];
-            strcpy(test_a_file_name, data_pair_folder);
-            strcat(test_a_file_name, "/test_a.txt");
-            ofstream test_a_file(test_a_file_name);
-            if (!test_a_file.is_open())
-                cout<<"can not open test_a.txt"<<endl;
-
-            //test_B (OUTPUT)
-            char test_b_file_name[150];
-            strcpy(test_b_file_name, data_pair_folder);
-            strcat(test_b_file_name, "/test_b.txt");
-            ofstream test_b_file(test_b_file_name);
-            if (!test_b_file.is_open())
-                cout<<"can not open test_b.txt"<<endl;
-
-            //test PAIRS CREATION
-            cout<<"testing pairs creation..."<<endl;
-            vector<vector<string> > test_pairs;
-            int t_pairs=0;
-            while(t_pairs<max_t_pairs){
-                for(int r=0; r<test_samples_matrix.size(); r++){
-                    vector<string> row=test_samples_matrix[r];//identity
-                    for(int c=ts; c<row.size(); c=c+oversampling){
-                        for(int d=0; d<ts; d=d+1){
-                            if(t_pairs<max_t_pairs){
-                                if(!test_samples_matrix[r][c].empty() && !test_samples_matrix[r][c-d].empty()){//positive pair
-                                    string a_sample=test_samples_matrix[r][c];
-                                    string bp_sample=test_samples_matrix[r][c-d];
-                                    //negative pair search
-                                    string bn_sample;
-                                    bool impostor_found=false;
-                                    int n_searches=0;
-                                    while(impostor_found==false && n_searches<1000){
-                                        int x=rand() % test_samples_matrix.size();
-                                        int f=rand() % test_samples_matrix[x].size();
-                                        if(!test_samples_matrix[x][f].empty() && x!=r){
-                                            bn_sample=test_samples_matrix[x][f];
-                                            impostor_found=true;
-                                        }
-                                        n_searches++;
-                                    }
-                                    if(impostor_found){//add pairs
-                                        vector<string> pair_p;
-                                        pair_p.push_back(a_sample);
-                                        pair_p.push_back(bp_sample);
-                                        test_pairs.push_back(pair_p);
-                                        t_pairs++;
-                                        vector<string> pair_n;
-                                        pair_n.push_back(a_sample);
-                                        pair_n.push_back(bn_sample);
-                                        test_pairs.push_back(pair_n);
-                                        t_pairs++;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            //random generation for test
-            int n_tracklets=test_pairs.size();
-            vector<int> random_index;
-            for(int t=0; t<n_tracklets; t++)
-                random_index.push_back(t);
-            std::random_shuffle ( random_index.begin(), random_index.end() );
-            for(int t=0; t<n_tracklets; t++){
-                //an, p, n
-                test_a_file << test_pairs[random_index[t]][0]<<"\n";
-                test_b_file << test_pairs[random_index[t]][1]<<"\n";
-            }
-
-            //CLOSE OUTPUT FILES
-            test_a_file.close();
-            test_b_file.close();
-
-
-
-    }else{
-        cout<<"  Not enough identities to create data"<<endl;
-    }
-
-
-}
-
-
-
