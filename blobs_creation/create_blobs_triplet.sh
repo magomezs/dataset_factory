@@ -1,15 +1,12 @@
 #!/usr/bin/env sh
 
-DATASET=../DATASETS/PRID1/
+DATASET= dataset_directory
 TOOLS=../caffe/build/tools
-
 
 BLOBS=$DATASET/BLOBS/TRIPLET
 DATA=$DATASET/DATA/TRIPLET
 SAMPLES=$DATASET/SAMPLES/
 
-# Set RESIZE=true to resize the images to 256x256. Leave as false if images have
-# already been resized using another tool.
 RESIZE=true
 if $RESIZE; then
   RESIZE_HEIGHT=128
@@ -26,7 +23,6 @@ if [ ! -d "$SAMPLES" ]; then
        "where the ImageNet validation data is stored."
   exit 1
 fi
-
 
 
 echo "Creating train lmdb..."
