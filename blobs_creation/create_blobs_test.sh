@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-DATASET=../DATASETS/PRID1/
+DATASET= dataset_directory
 TOOLS=../caffe/build/tools
 
 
@@ -8,8 +8,7 @@ BLOBS=$DATASET/BLOBS/TEST
 DATA=$DATASET/DATA/TEST
 SAMPLES=$DATASET/SAMPLES/
 
-# Set RESIZE=true to resize the images to 256x256. Leave as false if images have
-# already been resized using another tool.
+
 RESIZE=true
 if $RESIZE; then
   RESIZE_HEIGHT=128
@@ -18,7 +17,6 @@ else
   RESIZE_HEIGHT=0
   RESIZE_WIDTH=0
 fi
-
 
 
 if [ ! -d "$SAMPLES" ]; then
