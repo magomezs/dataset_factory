@@ -7,8 +7,7 @@ BLOBS=$DATASET/BLOBS/PAIR
 DATA=$DATASET/DATA/PAIR/   
 SAMPLES=$DATASET/SAMPLES/
 
-# Set RESIZE=true to resize the images. Leave as false if images have
-# already been resized using another tool.
+
 RESIZE=true
 if $RESIZE; then
   RESIZE_HEIGHT=128
