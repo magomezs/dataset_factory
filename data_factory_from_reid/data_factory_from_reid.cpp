@@ -111,7 +111,6 @@ void train_val_test_division(string dataset_folder, int a_samples_for_training, 
     if (!file_cam_a_test.is_open())
         cout<<"4. can not open "<<file_cam_a_test_name<<endl;
 
-
     strcpy(file_cam_b_name, dataset_folder.c_str());
     strcat(file_cam_b_name, "/DATA/cam_b.txt");
     ifstream file_cam_b(file_cam_b_name);
@@ -402,7 +401,7 @@ void create_pair_data(string dataset_folder, int trainset_size, int valset_size,
     //DATA FOLDER
     char data_folder[150];
     strcpy(data_folder, dataset_folder.c_str());
-    strcat(data_folder, "/UMBALANCE_DATA");
+    strcat(data_folder, "/DATA");
     int e=mkdir(data_folder, ACCESSPERMS);
 
     //DATA PAIRS FOLDER
@@ -411,10 +410,7 @@ void create_pair_data(string dataset_folder, int trainset_size, int valset_size,
     strcat(data_pair_folder, "/PAIR");
     int ePAIR=mkdir(data_pair_folder, ACCESSPERMS);
 
-
-
     //train data sets----------------------------------------------------------------------------------------------------
-
     char file_cam_a_train_name[150], file_cam_b_train_name[150], file_a_train_name[150], file_b_train_name[150];
 
     strcpy(file_cam_a_train_name, data_folder);
@@ -471,7 +467,6 @@ void create_pair_data(string dataset_folder, int trainset_size, int valset_size,
     }
     file_cam_b_train.close();
 
-
     file_cam_a_train.open(file_cam_a_train_name);
     if (!file_cam_a_train.is_open())
         cout<<"can not open "<<file_cam_a_train_name<<endl;
@@ -479,7 +474,6 @@ void create_pair_data(string dataset_folder, int trainset_size, int valset_size,
     file_cam_b_train.open(file_cam_b_train_name);
     if (!file_cam_b_train.is_open())
         cout<<"can not open "<<file_cam_b_train_name<<endl;
-
 
     //vectors WITH THE SAMPLES NAMES train A and B
     vector<string> samples_train_a, samples_train_b;
@@ -731,7 +725,6 @@ void create_pair_data(string dataset_folder, int trainset_size, int valset_size,
     }
     file_val_a.close();
     file_val_b.close();
-
 }
 
 
@@ -749,11 +742,7 @@ void create_triplet_data_fixed_cam(string dataset_folder, int trainset_size, int
     int etri=mkdir(data_triplet_folder, ACCESSPERMS);
 
 
-
-
-
     //train data sets----------------------------------------------------------------------------------------------------
-
     char file_cam_a_train_name[150], file_cam_b_train_name[150], file_an_train_name[150], file_p_train_name[150], file_n_train_name[150];
 
     strcpy(file_cam_a_train_name, data_folder);
@@ -888,8 +877,6 @@ void create_triplet_data_fixed_cam(string dataset_folder, int trainset_size, int
     file_train_n.close();
 
 
-
-
     //val data sets----------------------------------------------------------------------------------------------------
     char file_cam_a_val_name[150], file_cam_b_val_name[150], file_an_val_name[150], file_p_val_name[150], file_n_val_name[150];
 
@@ -922,8 +909,6 @@ void create_triplet_data_fixed_cam(string dataset_folder, int trainset_size, int
     ofstream file_val_n(file_n_val_name);
     if (!file_val_n.is_open())
         cout<<"5. can not open "<<file_n_val_name<<endl;
-
-
 
     //max id in val_a
     max_id_a=0;
@@ -1039,8 +1024,6 @@ void create_triplet_data(string dataset_folder, int trainset_size, int valset_si
     strcpy(data_triplet_folder, data_folder);
     strcat(data_triplet_folder, "/TRIPLET");
     int etri=mkdir(data_triplet_folder, ACCESSPERMS);
-
-
 
 
     //train data sets----------------------------------------------------------------------------------------------------
@@ -1191,8 +1174,6 @@ void create_triplet_data(string dataset_folder, int trainset_size, int valset_si
     file_train_n.close();
 
 
-
-
     //val data sets----------------------------------------------------------------------------------------------------
     char file_cam_a_val_name[150], file_cam_b_val_name[150], file_an_val_name[150], file_p_val_name[150], file_n_val_name[150];
 
@@ -1289,7 +1270,6 @@ void create_triplet_data(string dataset_folder, int trainset_size, int valset_si
     }
     file_cam_b_val.close();
 
-    cout<<"ghoooookt"<<endl;
     //positive and negative matrixes
     vector< vector<string> > positive_val_pairs;
     positive_val_pairs.resize(max_id_a);
@@ -1305,7 +1285,6 @@ void create_triplet_data(string dataset_folder, int trainset_size, int valset_si
         }
     }
 
-    cout<<"ghjukt"<<endl;
     srand(time(NULL));
     n_pair=0;
     while(n_pair<valset_size){
@@ -1424,13 +1403,9 @@ void create_test_data(string dataset_folder){
         file_cam_b_test.open(file_cam_b_test_name);
     }
 
-
-
     file_cam_a_test.close();
     file_cam_b_test.close();
     file_test_a.close();
     file_test_b.close();
 
 }
-
-
