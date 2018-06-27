@@ -13,6 +13,7 @@ Then, there is a set of scripts to create the blobs from the datasets using the 
 - blobs_creation: generate caffe data blobs
 
 <br />
+
 # Example of how to use data_factory_from_reid
 This is an example of how to use data_factory_from_reid with PRID2011[1] and ViPER datasets[2].
 
