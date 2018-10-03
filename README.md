@@ -64,3 +64,5 @@ create_tracklet_data(mot,  200000, 20000, 16, 16, 1, 0.9); <br />
 [4] https://motchallenge.net/data/MOT17/
       
       
+# ACKNOWLEDGMENTS
+This work was supported by the Spanish Government through the CICYT projects (TRA2015-63708-R and TRA2016-78886-C3-1-R), and Ministerio de Educación, Cultura y Deporte para la Formación de Profesorado Universitario (FPU14/02143), and Comunidad de Madrid through SEGVAUTO-TRIES (S2013/MIT- 2713). We gratefully acknowledge the support of NVIDIA Corporation with the donation of the GPUs used for this research.
