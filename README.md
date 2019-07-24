@@ -14,6 +14,22 @@ Then, there is a set of scripts to create the blobs from the datasets using the 
 
 <br />
 
+# Citation
+Please cite dataset_factory in your publications if it helps your research:
+@article{gomez2019balancing,
+  title={Balancing people re-identification data for deep parts similarity learning},
+  author={G{\'o}mez-Silva, Mar{\'\i}a Jos{\'e} and Armingol, Jos{\'e} Mar{\'\i}a and Escalera, Arturo de la},
+  journal={Journal of Imaging Science and Technology},
+  volume={63},
+  number={2},
+  pages={20401--1},
+  year={2019},
+  publisher={Society for Imaging Science and Technology}
+}
+Gómez-Silva, M. J., Armingol, J. M., & Escalera, A. D. L. (2019). Balancing people re-identification data for deep parts similarity learning. Journal of Imaging Science and Technology, 63(2), 20401-1.
+
+
+
 # Example of how to use data_factory_from_reid
 This is an example of how to use data_factory_from_reid with PRID2011[1] and ViPER datasets[2].
 
