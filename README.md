@@ -15,7 +15,7 @@ Then, there is a set of scripts to create the blobs from the datasets using the 
 <br />
 
 # Citation
-Please cite dataset_factory in your publications if it helps your research:
+Please cite dataset_factory_from_reid in your publications if it helps your research:
 @article{gomez2019balancing,
   title={Balancing people re-identification data for deep parts similarity learning},
   author={G{\'o}mez-Silva, Mar{\'\i}a Jos{\'e} and Armingol, Jos{\'e} Mar{\'\i}a and Escalera, Arturo de la},
@@ -28,6 +28,18 @@ Please cite dataset_factory in your publications if it helps your research:
 }
 Gómez-Silva, M. J., Armingol, J. M., & Escalera, A. D. L. (2019). Balancing people re-identification data for deep parts similarity learning. Journal of Imaging Science and Technology, 63(2), 20401-1.
 
+
+Please cite dataset_factory_from_mot in your publications if it helps your research:
+@article{gomez2019transferring,
+  title={Transferring learning from multi-person tracking to person re-identification},
+  author={G{\'o}mez-Silva, Mar{\'\i}a Jos{\'e} and Izquierdo, Ebroul and Escalera, Arturo de la and Armingol, Jos{\'e} Mar{\'\i}a},
+  journal={Integrated Computer-Aided Engineering},
+  number={Preprint},
+  pages={1--16},
+  year={2019},
+  publisher={IOS Press}
+}
+Gómez-Silva, M. J., Izquierdo, E., Escalera, A. D. L., & Armingol, J. M. (2019). Transferring learning from multi-person tracking to person re-identification. Integrated Computer-Aided Engineering, (Preprint), 1-16.
 
 
 # Example of how to use data_factory_from_reid
