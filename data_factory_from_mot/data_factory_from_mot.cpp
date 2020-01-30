@@ -1093,3 +1093,2766 @@ void create_tracklet_data(string dataset_folder, int max_t_tracklets, int max_v_
     }
 
 }
+
+
+void create_contiguous_tracklet_data(string dataset_folder, int max_tr_tracklets, int max_v_tracklets, int max_ts_tracklets, int td, int oversampling, float training_identities_ratio, float val_identities_ratio){
+    srand (time(NULL));
+
+    //DATA FOLDER
+    char data_folder[150];
+    strcpy(data_folder, dataset_folder.c_str());
+    strcat(data_folder, "/DATA");
+    int e=mkdir(data_folder, ACCESSPERMS);
+
+    //DATA PAIRS FOLDER
+    char data_tracklet_folder[150];
+    strcpy(data_tracklet_folder, data_folder);
+    strcat(data_tracklet_folder, "/TRACKLET/CONTIGUOUS_TRACKLET");
+    int eT=mkdir(data_tracklet_folder, ACCESSPERMS);
+
+
+    //SAMPLES FOLDERS
+    char samples_folder[150], train_samples_folder[150];
+    strcpy(samples_folder, dataset_folder.c_str());
+    strcat(samples_folder, "/SAMPLES");
+    strcpy(train_samples_folder, samples_folder);
+    strcat(train_samples_folder, "/train");
+
+    //SAMPLES LIST FILE
+    char samples_list_file_name[150];
+    strcpy(samples_list_file_name, train_samples_folder);
+    strcat(samples_list_file_name, "/train_samples_list.txt");
+    ifstream samples_list_file(samples_list_file_name);
+    if (!samples_list_file.is_open())
+        cout<<"can not open "<<samples_list_file_name<<endl;
+
+    char samples_list_file_name_new[150];
+    strcpy(samples_list_file_name_new, data_folder);
+    strcat(samples_list_file_name_new, "/train_samples_list.txt");
+    ofstream samples_list_file_new(samples_list_file_name_new);
+    if (!samples_list_file_new.is_open())
+        cout<<"can not open "<<samples_list_file_name_new<<endl;
+
+    string line;
+    int max_id=0;
+    int previous_id=0;
+    int new_id=0;
+    int max_frame=0;
+    while ( std::getline (samples_list_file,line))//
+    {
+        std::stringstream ss;
+        ss.str(line);
+        std::vector<std::string> strs;
+        boost::split(strs, line, boost::is_any_of(","));
+        int frame=atoi(strs[2].c_str());
+        int id=atoi(strs[3].c_str());
+        if (id!=previous_id){
+            previous_id=id;
+            new_id++;
+        }
+        samples_list_file_new<<strs[0]<<","<<strs[1]<<","<<strs[2]<<", "<<new_id<<"\n";
+        if(new_id>max_id)
+            max_id=new_id;
+        if (frame>max_frame)
+            max_frame=frame;
+    }
+    samples_list_file.close();
+    samples_list_file_new.close();
+
+    if(max_id>1){
+        samples_list_file.open(samples_list_file_name_new);
+
+        //MATRIX WITH THE SAMPLES NAMES
+        vector<vector<string> > aux_samples_matrix, samples_matrix;
+        int height = max_id;
+        int width = max_frame;
+        aux_samples_matrix.resize(height);
+        for(int i = 0; i < height; i++) aux_samples_matrix[i].resize(width);
+        while ( std::getline (samples_list_file,line))
+        {
+            std::stringstream ss;
+            ss.str(line);
+            std::vector<std::string> strs;
+            boost::split(strs, line, boost::is_any_of(","));
+            int frame=atoi(strs[2].c_str());
+            int id=atoi(strs[3].c_str());
+            string label_a="0000";
+            stringstream s3;
+            s3 << id;
+            string idn = s3.str();
+            int size=idn.size();
+            label_a.replace(label_a.end()-size, label_a.end(), idn);
+            char sample[100];
+            strcpy(sample, strs[0].c_str());
+            strcat(sample, " ");
+            strcat(sample, label_a.c_str());
+            vector<string> row=aux_samples_matrix[id-1];
+            row[frame-1]=sample;
+            aux_samples_matrix[id-1]=row;
+        }
+
+
+        //random identitys order
+        int n_identities=aux_samples_matrix.size();
+        vector<int> random_index;
+        for(int t=0; t<n_identities; t++)
+            random_index.push_back(t);
+        std::random_shuffle ( random_index.begin(), random_index.end() );
+        for(int t=0; t<n_identities; t++){
+            //an, p, n
+            int index=random_index[t];
+            vector<string> row= aux_samples_matrix[index];
+            samples_matrix.push_back(row);
+        }
+
+
+
+        //TRAIN-VAL IDENTITIES DIVISION
+        cout<<"Train-val identities division..."<<endl;
+        vector<vector<string> > val_samples_matrix, train_samples_matrix, test_samples_matrix;
+        int train_size=0;
+        int val_size=0;
+        int test_size=0;
+        for(int r=0; r<samples_matrix.size(); r++){
+            vector<string> identity=samples_matrix[r];
+            if(!identity.empty()){
+                int id=r;
+                int grupos=max_id/100;
+                int rest=max_id%100;
+                //if(id!=189){
+                    if(id<grupos*100){
+                        if((id%100)< cvRound(training_identities_ratio*100.0)){//train
+                            train_samples_matrix.push_back(identity);
+                            train_size++;
+                        }else{//val
+                            if((id%100)< cvRound((training_identities_ratio+val_identities_ratio)*100.0)){
+                                val_samples_matrix.push_back(identity);
+                                val_size++;
+                            }else{//test
+                                test_samples_matrix.push_back(identity);
+                                test_size++;
+                            }
+                        }
+                    }else{
+                        if(float(float(id-grupos*100)/float(rest)) <= training_identities_ratio){//train
+                            train_samples_matrix.push_back(identity);
+                            train_size++;
+                        }else{//val
+                            if(float(float(id-grupos*100)/float(rest)) <= training_identities_ratio+val_identities_ratio){
+                                val_samples_matrix.push_back(identity);
+                                val_size++;
+                            }else{//test
+                                test_samples_matrix.push_back(identity);
+                                test_size++;
+                            }
+                        }
+                    }
+                //}
+
+            }
+        }
+
+        cout<< train_samples_matrix.size()<<" "<< val_samples_matrix.size()<<" "<<test_samples_matrix.size()<<" "<<max_id<<endl;
+
+        ///------------------------------------------------------------------------------------------------------------------------------
+
+        if(train_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream> > files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/train_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //TRAIN TRACKLETS CREATION
+            cout<<"Training tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int t_tracklets=0;
+            while(t_tracklets<max_tr_tracklets){
+                for(int r=0; r<train_samples_matrix.size(); r++){
+                    vector<string> row=train_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        bool condition=true;
+                        //check id the identity have enough contiguous frames representations to create a tracklet
+                        for(int d=0; d<td; d++){
+                            if(train_samples_matrix[r][c-d].empty())
+                                condition=false;
+                        }
+
+                        if(condition){//tracklet creation
+                           // for(int n=0; n<ts; n++){
+                            int n=0;
+                                if(t_tracklets<max_tr_tracklets){
+
+                                    vector<string> positive_tracklet, negative_tracklet;
+                                    positive_tracklet.resize(td);
+                                    for(int d=1; d<td; d++){
+                                        positive_tracklet[d]=train_samples_matrix[r][c-d];
+                                    }
+                                    //search the positive
+                                    bool positive_found=false;
+                                    if(c+n<row.size()){
+                                        if(!train_samples_matrix[r][c+n].empty())
+                                        {
+                                            positive_tracklet[0]=train_samples_matrix[r][c+n];
+                                            positive_found=true;
+                                        }
+                                    }
+                                    if(positive_found){
+                                        //search of the impostor
+                                        string impostor;
+                                        bool impostor_found=false;
+                                        int n_searches=0;
+                                        while(impostor_found==false && n_searches<1000){
+                                            int x=rand() % (train_samples_matrix.size()-1);
+                                            int f=rand() % (row.size()-1);
+                                            if(!train_samples_matrix[x][f].empty() && x!=r){
+                                                impostor=train_samples_matrix[x][f];
+                                                impostor_found=true;
+                                            }
+                                        }
+                                        if(impostor_found){
+                                            negative_tracklet=positive_tracklet;
+                                            negative_tracklet[0]=impostor;
+                                            tracklets_matrix.push_back(positive_tracklet);
+                                            t_tracklets++;
+                                            tracklets_matrix.push_back(negative_tracklet);
+                                            t_tracklets++;
+                                        }
+                                    }
+                                }
+                           // }
+
+                        }
+
+                    }
+                }
+            }
+
+            //random generation for train
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+        }else{
+            cout<<"     Not enough identities to create train data"<<endl;
+        }
+
+        if(val_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream>> files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/val_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //TRAIN TRACKLETS CREATION
+            cout<<"Validation tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int v_tracklets=0;
+            while(v_tracklets<max_v_tracklets){
+                for(int r=0; r<val_samples_matrix.size(); r++){
+                    vector<string> row=val_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        bool condition=true;
+
+                        //check id the identity have enough contiguous frames representations to create a tracklet
+                        for(int d=0; d<td; d++){
+                                if(val_samples_matrix[r][c-d].empty())
+                                    condition=false;
+                        }
+
+                        if(condition){//tracklet creation
+                            //for(int n=0; n<ts; n++){
+                                int n=0;
+                                if(v_tracklets<max_v_tracklets){
+                                    vector<string> positive_tracklet, negative_tracklet;
+                                    positive_tracklet.resize(td);
+                                    for(int d=1; d<td; d++){
+                                        positive_tracklet[d]=val_samples_matrix[r][c-d];
+                                    }
+                                    //search the positive
+                                    bool positive_found=false;
+                                    if(c+n<row.size()){
+                                        if(!val_samples_matrix[r][c+n].empty())
+                                        {
+                                            positive_tracklet[0]=val_samples_matrix[r][c+n];
+                                            positive_found=true;
+                                        }
+                                    }
+                                    if(positive_found){
+                                        //search of the impostor
+                                        string impostor;
+                                        bool impostor_found=false;
+                                        int n_searches=0;
+                                        while(impostor_found==false && n_searches<1000){
+                                            int x=rand() % (val_samples_matrix.size()-1);
+                                            int f=rand() % (row.size()-1);
+                                            if(!val_samples_matrix[x][f].empty() && x!=r){
+                                                impostor=val_samples_matrix[x][f];
+                                                impostor_found=true;
+                                            }
+                                        }
+                                        if(impostor_found){
+                                            negative_tracklet=positive_tracklet;
+                                            negative_tracklet[0]=impostor;
+                                            tracklets_matrix.push_back(positive_tracklet);
+                                            v_tracklets++;
+                                            tracklets_matrix.push_back(negative_tracklet);
+                                            v_tracklets++;
+                                        }
+                                    }
+                                }
+                           // }
+
+                        }
+
+
+
+                    }
+                }
+            }
+
+            //random generation for val
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create val data"<<endl;
+        }
+
+        if(test_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream>> files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/test_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //TRAIN TRACKLETS CREATION
+            cout<<"Test tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int v_tracklets=0;
+            while(v_tracklets<max_ts_tracklets){
+                for(int r=0; r<test_samples_matrix.size(); r++){
+                    vector<string> row=test_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        bool condition=true;
+
+                        //check id the identity have enough contiguous frames representations to create a tracklet
+                        for(int d=0; d<td; d++){
+                                if(test_samples_matrix[r][c-d].empty())
+                                    condition=false;
+                        }
+
+                        if(condition){//tracklet creation
+                            //for(int n=0; n<ts; n++){
+                            int n=0;
+                                if(v_tracklets<max_ts_tracklets){
+                                    vector<string> positive_tracklet, negative_tracklet;
+                                    positive_tracklet.resize(td);
+                                    for(int d=1; d<td; d++){
+                                        positive_tracklet[d]=test_samples_matrix[r][c-d];
+                                    }
+                                    //search the positive
+                                    bool positive_found=false;
+                                    if(c+n<row.size()){
+                                        if(!test_samples_matrix[r][c+n].empty())
+                                        {
+                                            positive_tracklet[0]=test_samples_matrix[r][c+n];
+                                            positive_found=true;
+                                        }
+                                    }
+                                    if(positive_found){
+                                        //search of the impostor
+                                        string impostor;
+                                        bool impostor_found=false;
+                                        int n_searches=0;
+                                        while(impostor_found==false && n_searches<1000){
+                                            int x=rand() % (test_samples_matrix.size()-1);
+                                            int f=rand() % (row.size()-1);
+                                            if(!test_samples_matrix[x][f].empty() && x!=r){
+                                                impostor=test_samples_matrix[x][f];
+                                                impostor_found=true;
+                                            }
+                                        }
+                                        if(impostor_found){
+                                            negative_tracklet=positive_tracklet;
+                                            negative_tracklet[0]=impostor;
+                                            tracklets_matrix.push_back(positive_tracklet);
+                                            v_tracklets++;
+                                            tracklets_matrix.push_back(negative_tracklet);
+                                            v_tracklets++;
+                                        }
+                                    }
+                                }
+                           // }
+
+                        }
+
+
+
+                    }
+                }
+            }
+
+            //random generation for test
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create test data"<<endl;
+        }
+
+    }else{
+        cout<<"  Not enough identities to create data"<<endl;
+    }
+
+}
+
+
+void create_reid_tracklet_data(string dataset_folder, int max_tr_tracklets, int max_v_tracklets, int max_ts_tracklets, int ts, int td, int oversampling, float training_identities_ratio, float val_identities_ratio){
+    srand (time(NULL));
+
+    //DATA FOLDER
+    char data_folder[150];
+    strcpy(data_folder, dataset_folder.c_str());
+    strcat(data_folder, "/DATA");
+    int e=mkdir(data_folder, ACCESSPERMS);
+
+    //DATA PAIRS FOLDER
+    char data_tracklet_folder[150];
+    strcpy(data_tracklet_folder, data_folder);
+    strcat(data_tracklet_folder, "/TRACKLET/REID_TRACKLET");
+    int eT=mkdir(data_tracklet_folder, ACCESSPERMS);
+
+
+    //SAMPLES FOLDERS
+    char samples_folder[150], train_samples_folder[150];
+    strcpy(samples_folder, dataset_folder.c_str());
+    strcat(samples_folder, "/SAMPLES");
+    strcpy(train_samples_folder, samples_folder);
+    strcat(train_samples_folder, "/train");
+
+    //SAMPLES LIST FILE
+    char samples_list_file_name[150];
+    strcpy(samples_list_file_name, train_samples_folder);
+    strcat(samples_list_file_name, "/train_samples_list.txt");
+    ifstream samples_list_file(samples_list_file_name);
+    if (!samples_list_file.is_open())
+        cout<<"can not open "<<samples_list_file_name<<endl;
+
+    char samples_list_file_name_new[150];
+    strcpy(samples_list_file_name_new, data_folder);
+    strcat(samples_list_file_name_new, "/train_samples_list.txt");
+    ofstream samples_list_file_new(samples_list_file_name_new);
+    if (!samples_list_file_new.is_open())
+        cout<<"can not open "<<samples_list_file_name_new<<endl;
+
+    string line;
+    int max_id=0;
+    int previous_id=0;
+    int new_id=0;
+    int max_frame=0;
+    while ( std::getline (samples_list_file,line))//
+    {
+        std::stringstream ss;
+        ss.str(line);
+        std::vector<std::string> strs;
+        boost::split(strs, line, boost::is_any_of(","));
+        int frame=atoi(strs[2].c_str());
+        int id=atoi(strs[3].c_str());
+        if (id!=previous_id){
+            previous_id=id;
+            new_id++;
+        }
+        samples_list_file_new<<strs[0]<<","<<strs[1]<<","<<strs[2]<<", "<<new_id<<"\n";
+        if(new_id>max_id)
+            max_id=new_id;
+        if (frame>max_frame)
+            max_frame=frame;
+    }
+    samples_list_file.close();
+    samples_list_file_new.close();
+
+    if(max_id>1){
+        samples_list_file.open(samples_list_file_name_new);
+
+        //MATRIX WITH THE SAMPLES NAMES
+        vector<vector<string> > aux_samples_matrix, samples_matrix;
+        int height = max_id;
+        int width = max_frame;
+        aux_samples_matrix.resize(height);
+        for(int i = 0; i < height; i++) aux_samples_matrix[i].resize(width);
+        while ( std::getline (samples_list_file,line))
+        {
+            std::stringstream ss;
+            ss.str(line);
+            std::vector<std::string> strs;
+            boost::split(strs, line, boost::is_any_of(","));
+            int frame=atoi(strs[2].c_str());
+            int id=atoi(strs[3].c_str());
+            string label_a="0000";
+            stringstream s3;
+            s3 << id;
+            string idn = s3.str();
+            int size=idn.size();
+            label_a.replace(label_a.end()-size, label_a.end(), idn);
+            char sample[100];
+            strcpy(sample, strs[0].c_str());
+            strcat(sample, " ");
+            strcat(sample, label_a.c_str());
+            vector<string> row=aux_samples_matrix[id-1];
+            row[frame-1]=sample;
+            aux_samples_matrix[id-1]=row;
+        }
+
+
+        //random identitys order
+        int n_identities=aux_samples_matrix.size();
+        vector<int> random_index;
+        for(int t=0; t<n_identities; t++)
+            random_index.push_back(t);
+        std::random_shuffle ( random_index.begin(), random_index.end() );
+        for(int t=0; t<n_identities; t++){
+            //an, p, n
+            int index=random_index[t];
+            vector<string> row= aux_samples_matrix[index];
+            samples_matrix.push_back(row);
+        }
+
+
+
+        //TRAIN-VAL IDENTITIES DIVISION
+        cout<<"Train-val identities division..."<<endl;
+        vector<vector<string> > val_samples_matrix, train_samples_matrix, test_samples_matrix;
+        int train_size=0;
+        int val_size=0;
+        int test_size=0;
+        for(int r=0; r<samples_matrix.size(); r++){
+            vector<string> identity=samples_matrix[r];
+            if(!identity.empty()){
+                int id=r;
+                int grupos=max_id/100;
+                int rest=max_id%100;
+                //if(id!=189){
+                    if(id<grupos*100){
+                        if((id%100)< cvRound(training_identities_ratio*100.0)){//train
+                            train_samples_matrix.push_back(identity);
+                            train_size++;
+                        }else{//val
+                            if((id%100)< cvRound((training_identities_ratio+val_identities_ratio)*100.0)){
+                                val_samples_matrix.push_back(identity);
+                                val_size++;
+                            }else{//test
+                                test_samples_matrix.push_back(identity);
+                                test_size++;
+                            }
+                        }
+                    }else{
+                        if(float(float(id-grupos*100)/float(rest)) <= training_identities_ratio){//train
+                            train_samples_matrix.push_back(identity);
+                            train_size++;
+                        }else{//val
+                            if(float(float(id-grupos*100)/float(rest)) <= training_identities_ratio+val_identities_ratio){
+                                val_samples_matrix.push_back(identity);
+                                val_size++;
+                            }else{//test
+                                test_samples_matrix.push_back(identity);
+                                test_size++;
+                            }
+                        }
+                    }
+                //}
+
+            }
+        }
+
+        cout<< train_samples_matrix.size()<<" "<< val_samples_matrix.size()<<" "<<test_samples_matrix.size()<<" "<<max_id<<endl;
+
+        ///------------------------------------------------------------------------------------------------------------------------------
+
+        if(train_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream> > files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/train_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //TRAIN TRACKLETS CREATION
+            cout<<"Training tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int t_tracklets=0;
+            while(t_tracklets<max_tr_tracklets){
+                for(int r=0; r<train_samples_matrix.size(); r++){
+                    vector<string> row=train_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        bool condition=true;
+                        //check id the identity have enough contiguous frames representations to create a tracklet
+                        for(int d=1; d<td; d++){
+                            if(train_samples_matrix[r][c-d].empty())
+                                condition=false;
+                        }
+
+                        if(condition){//tracklet creation
+                            for(int n=0; n<ts; n++){
+                                if(t_tracklets<max_tr_tracklets){
+
+                                    vector<string> positive_tracklet, negative_tracklet;
+                                    positive_tracklet.resize(td);
+                                    for(int d=1; d<td; d++){
+                                        positive_tracklet[d]=train_samples_matrix[r][c-d];
+                                    }
+                                    //search the positive
+                                    bool positive_found=false;
+                                    if(c+n<row.size()){
+                                        if(!train_samples_matrix[r][c+n].empty())
+                                        {
+                                            positive_tracklet[0]=train_samples_matrix[r][c+n];
+                                            positive_found=true;
+                                        }
+                                    }
+                                    if(positive_found){
+                                        //search of the impostor
+                                        string impostor;
+                                        bool impostor_found=false;
+                                        int n_searches=0;
+                                        while(impostor_found==false && n_searches<1000){
+                                            int x=rand() % (train_samples_matrix.size()-1);
+                                            int f=rand() % (row.size()-1);
+                                            if(!train_samples_matrix[x][f].empty() && x!=r){
+                                                impostor=train_samples_matrix[x][f];
+                                                impostor_found=true;
+                                            }
+                                        }
+                                        if(impostor_found){
+                                            negative_tracklet=positive_tracklet;
+                                            negative_tracklet[0]=impostor;
+                                            tracklets_matrix.push_back(positive_tracklet);
+                                            t_tracklets++;
+                                            tracklets_matrix.push_back(negative_tracklet);
+                                            t_tracklets++;
+                                        }
+                                    }
+                                }
+                            }
+
+                        }
+
+                    }
+                }
+            }
+
+            //random generation for train
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create train data"<<endl;
+        }
+
+        if(val_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream>> files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/val_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //TRAIN TRACKLETS CREATION
+            cout<<"Validation tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int v_tracklets=0;
+            while(v_tracklets<max_v_tracklets){
+                for(int r=0; r<val_samples_matrix.size(); r++){
+                    vector<string> row=val_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        bool condition=true;
+
+                        //check id the identity have enough contiguous frames representations to create a tracklet
+                        for(int d=1; d<td; d++){
+                                if(val_samples_matrix[r][c-d].empty())
+                                    condition=false;
+                        }
+
+                        if(condition){//tracklet creation
+                            for(int n=0; n<ts; n++){
+                                if(v_tracklets<max_v_tracklets){
+                                    vector<string> positive_tracklet, negative_tracklet;
+                                    positive_tracklet.resize(td);
+                                    for(int d=1; d<td; d++){
+                                        positive_tracklet[d]=val_samples_matrix[r][c-d];
+                                    }
+                                    //search the positive
+                                    bool positive_found=false;
+                                    if(c+n<row.size()){
+                                        if(!val_samples_matrix[r][c+n].empty())
+                                        {
+                                            positive_tracklet[0]=val_samples_matrix[r][c+n];
+                                            positive_found=true;
+                                        }
+                                    }
+                                    if(positive_found){
+                                        //search of the impostor
+                                        string impostor;
+                                        bool impostor_found=false;
+                                        int n_searches=0;
+                                        while(impostor_found==false && n_searches<1000){
+                                            int x=rand() % (val_samples_matrix.size()-1);
+                                            int f=rand() % (row.size()-1);
+                                            if(!val_samples_matrix[x][f].empty() && x!=r){
+                                                impostor=val_samples_matrix[x][f];
+                                                impostor_found=true;
+                                            }
+                                        }
+                                        if(impostor_found){
+                                            negative_tracklet=positive_tracklet;
+                                            negative_tracklet[0]=impostor;
+                                            tracklets_matrix.push_back(positive_tracklet);
+                                            v_tracklets++;
+                                            tracklets_matrix.push_back(negative_tracklet);
+                                            v_tracklets++;
+                                        }
+                                    }
+                                }
+                            }
+
+                        }
+
+
+
+                    }
+                }
+            }
+
+            //random generation for val
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create val data"<<endl;
+        }
+
+        if(test_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream>> files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/test_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //Test TRACKLETS CREATION
+            cout<<"Test tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int v_tracklets=0;
+            while(v_tracklets<max_ts_tracklets){
+                for(int r=0; r<test_samples_matrix.size(); r++){
+                    vector<string> row=test_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        bool condition=true;
+
+                        //check id the identity have enough contiguous frames representations to create a tracklet
+                        for(int d=1; d<td; d++){
+                                if(test_samples_matrix[r][c-d].empty())
+                                    condition=false;
+                        }
+
+                        if(condition){//tracklet creation
+                            for(int n=0; n<ts; n++){
+                                if(v_tracklets<max_ts_tracklets){
+                                    vector<string> positive_tracklet, negative_tracklet;
+                                    positive_tracklet.resize(td);
+                                    for(int d=1; d<td; d++){
+                                        positive_tracklet[d]=test_samples_matrix[r][c-d];
+                                    }
+                                    //search the positive
+                                    bool positive_found=false;
+                                    if(c+n<row.size()){
+                                        if(!test_samples_matrix[r][c+n].empty())
+                                        {
+                                            positive_tracklet[0]=test_samples_matrix[r][c+n];
+                                            positive_found=true;
+                                        }
+                                    }
+                                    if(positive_found){
+                                        //search of the impostor
+                                        string impostor;
+                                        bool impostor_found=false;
+                                        int n_searches=0;
+                                        while(impostor_found==false && n_searches<1000){
+                                            int x=rand() % (test_samples_matrix.size()-1);
+                                            int f=rand() % (row.size()-1);
+                                            if(!test_samples_matrix[x][f].empty() && x!=r){
+                                                impostor=test_samples_matrix[x][f];
+                                                impostor_found=true;
+                                            }
+                                        }
+                                        if(impostor_found){
+                                            negative_tracklet=positive_tracklet;
+                                            negative_tracklet[0]=impostor;
+                                            tracklets_matrix.push_back(positive_tracklet);
+                                            v_tracklets++;
+                                            tracklets_matrix.push_back(negative_tracklet);
+                                            v_tracklets++;
+                                        }
+                                    }
+                                }
+                            }
+
+                        }
+
+
+
+                    }
+                }
+            }
+
+            //random generation for test
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create test data"<<endl;
+        }
+
+    }else{
+        cout<<"  Not enough identities to create data"<<endl;
+    }
+
+}
+
+
+void create_intruders_tracklet_data(string dataset_folder, int max_tr_tracklets, int max_v_tracklets, int max_ts_tracklets, int td, int intruders, int oversampling, float training_identities_ratio, float val_identities_ratio){
+    srand (time(NULL));
+
+    //DATA FOLDER
+    char data_folder[150];
+    strcpy(data_folder, dataset_folder.c_str());
+    strcat(data_folder, "/DATA");
+    int e=mkdir(data_folder, ACCESSPERMS);
+
+    //DATA PAIRS FOLDER
+    char data_tracklet_folder[150];
+    strcpy(data_tracklet_folder, data_folder);
+    strcat(data_tracklet_folder, "/TRACKLET/INTRUDERS_TRACKLET");
+    int eT=mkdir(data_tracklet_folder, ACCESSPERMS);
+
+
+    //SAMPLES FOLDERS
+    char samples_folder[150], train_samples_folder[150];
+    strcpy(samples_folder, dataset_folder.c_str());
+    strcat(samples_folder, "/SAMPLES");
+    strcpy(train_samples_folder, samples_folder);
+    strcat(train_samples_folder, "/train");
+
+    //SAMPLES LIST FILE
+    char samples_list_file_name[150];
+    strcpy(samples_list_file_name, train_samples_folder);
+    strcat(samples_list_file_name, "/train_samples_list.txt");
+    ifstream samples_list_file(samples_list_file_name);
+    if (!samples_list_file.is_open())
+        cout<<"can not open "<<samples_list_file_name<<endl;
+
+    char samples_list_file_name_new[150];
+    strcpy(samples_list_file_name_new, data_folder);
+    strcat(samples_list_file_name_new, "/train_samples_list.txt");
+    ofstream samples_list_file_new(samples_list_file_name_new);
+    if (!samples_list_file_new.is_open())
+        cout<<"can not open "<<samples_list_file_name_new<<endl;
+
+    string line;
+    int max_id=0;
+    int previous_id=0;
+    int new_id=0;
+    int max_frame=0;
+    while ( std::getline (samples_list_file,line))//
+    {
+        std::stringstream ss;
+        ss.str(line);
+        std::vector<std::string> strs;
+        boost::split(strs, line, boost::is_any_of(","));
+        int frame=atoi(strs[2].c_str());
+        int id=atoi(strs[3].c_str());
+        if (id!=previous_id){
+            previous_id=id;
+            new_id++;
+        }
+        samples_list_file_new<<strs[0]<<","<<strs[1]<<","<<strs[2]<<", "<<new_id<<"\n";
+        if(new_id>max_id)
+            max_id=new_id;
+        if (frame>max_frame)
+            max_frame=frame;
+    }
+    samples_list_file.close();
+    samples_list_file_new.close();
+
+    if(max_id>1){
+        samples_list_file.open(samples_list_file_name_new);
+
+        //MATRIX WITH THE SAMPLES NAMES
+        vector<vector<string> > aux_samples_matrix, samples_matrix;
+        int height = max_id;
+        int width = max_frame;
+        aux_samples_matrix.resize(height);
+        for(int i = 0; i < height; i++) aux_samples_matrix[i].resize(width);
+        while ( std::getline (samples_list_file,line))
+        {
+            std::stringstream ss;
+            ss.str(line);
+            std::vector<std::string> strs;
+            boost::split(strs, line, boost::is_any_of(","));
+            int frame=atoi(strs[2].c_str());
+            int id=atoi(strs[3].c_str());
+            string label_a="0000";
+            stringstream s3;
+            s3 << id;
+            string idn = s3.str();
+            int size=idn.size();
+            label_a.replace(label_a.end()-size, label_a.end(), idn);
+            char sample[100];
+            strcpy(sample, strs[0].c_str());
+            strcat(sample, " ");
+            strcat(sample, label_a.c_str());
+            vector<string> row=aux_samples_matrix[id-1];
+            row[frame-1]=sample;
+            aux_samples_matrix[id-1]=row;
+        }
+
+
+        //random identitys order
+        int n_identities=aux_samples_matrix.size();
+        vector<int> random_index;
+        for(int t=0; t<n_identities; t++)
+            random_index.push_back(t);
+        std::random_shuffle ( random_index.begin(), random_index.end() );
+        for(int t=0; t<n_identities; t++){
+            //an, p, n
+            int index=random_index[t];
+            vector<string> row= aux_samples_matrix[index];
+            samples_matrix.push_back(row);
+        }
+
+
+
+        //TRAIN-VAL IDENTITIES DIVISION
+        cout<<"Train-val identities division..."<<endl;
+        vector<vector<string> > val_samples_matrix, train_samples_matrix, test_samples_matrix;
+        int train_size=0;
+        int val_size=0;
+        int test_size=0;
+        for(int r=0; r<samples_matrix.size(); r++){
+            vector<string> identity=samples_matrix[r];
+            if(!identity.empty()){
+                int id=r;
+                int grupos=max_id/100;
+                int rest=max_id%100;
+                //if(id!=189){
+                    if(id<grupos*100){
+                        if((id%100)< cvRound(training_identities_ratio*100.0)){//train
+                            train_samples_matrix.push_back(identity);
+                            train_size++;
+                        }else{//val
+                            if((id%100)< cvRound((training_identities_ratio+val_identities_ratio)*100.0)){
+                                val_samples_matrix.push_back(identity);
+                                val_size++;
+                            }else{//test
+                                test_samples_matrix.push_back(identity);
+                                test_size++;
+                            }
+                        }
+                    }else{
+                        if(float(float(id-grupos*100)/float(rest)) <= training_identities_ratio){//train
+                            train_samples_matrix.push_back(identity);
+                            train_size++;
+                        }else{//val
+                            if(float(float(id-grupos*100)/float(rest)) <= training_identities_ratio+val_identities_ratio){
+                                val_samples_matrix.push_back(identity);
+                                val_size++;
+                            }else{//test
+                                test_samples_matrix.push_back(identity);
+                                test_size++;
+                            }
+                        }
+                    }
+                //}
+
+            }
+        }
+
+        cout<< train_samples_matrix.size()<<" "<< val_samples_matrix.size()<<" "<<test_samples_matrix.size()<<" "<<max_id<<endl;
+
+        ///------------------------------------------------------------------------------------------------------------------------------
+
+        if(train_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream> > files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/train_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //TRAIN TRACKLETS CREATION
+            cout<<"Training tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int t_tracklets=0;
+            while(t_tracklets<max_tr_tracklets){
+                for(int r=0; r<train_samples_matrix.size(); r++){
+                    vector<string> row=train_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        bool condition=true;
+                        //check id the identity have enough contiguous frames representations to create a tracklet
+                        for(int d=0; d<td; d++){
+                            if(train_samples_matrix[r][c-d].empty())
+                                condition=false;
+                        }
+
+                        if(condition){//tracklet creation
+                           // for(int n=0; n<ts; n++){
+                            int n=0;
+                                if(t_tracklets<max_tr_tracklets){
+
+                                    vector<string> positive_tracklet, negative_tracklet;
+                                    positive_tracklet.resize(td);
+                                    for(int d=1; d<td; d++){
+                                        positive_tracklet[d]=train_samples_matrix[r][c-d];
+                                    }
+                                    //add intruders
+                                    int intru=0;
+                                    while(intru<intruders){
+                                        int index=1+(rand() % (td-2));
+                                        int frame= rand() % (row.size()-1);
+                                        int intru_id=rand() % (train_samples_matrix.size()-1);
+                                        if(!train_samples_matrix[intru_id][frame].empty() && intru_id!=r){
+                                            positive_tracklet[index]=train_samples_matrix[intru_id][frame];
+                                            intru++;
+                                        }
+                                    }
+                                    //search the positive
+                                    bool positive_found=false;
+                                    if(c+n<row.size()){
+                                        if(!train_samples_matrix[r][c+n].empty())
+                                        {
+                                            positive_tracklet[0]=train_samples_matrix[r][c+n];
+                                            positive_found=true;
+                                        }
+                                    }
+                                    if(positive_found){
+                                        //search of the impostor
+                                        string impostor;
+                                        bool impostor_found=false;
+                                        int n_searches=0;
+                                        while(impostor_found==false && n_searches<1000){
+                                            int x=rand() % (train_samples_matrix.size()-1);
+                                            int f=rand() % (row.size()-1);
+                                            if(!train_samples_matrix[x][f].empty() && x!=r){
+                                                impostor=train_samples_matrix[x][f];
+                                                impostor_found=true;
+                                            }
+                                        }
+                                        if(impostor_found){
+                                            negative_tracklet=positive_tracklet;
+                                            negative_tracklet[0]=impostor;
+                                            tracklets_matrix.push_back(positive_tracklet);
+                                            t_tracklets++;
+                                            tracklets_matrix.push_back(negative_tracklet);
+                                            t_tracklets++;
+                                        }
+                                    }
+                                }
+                           // }
+
+                        }
+
+                    }
+                }
+            }
+
+            //random generation for train
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+        }else{
+            cout<<"     Not enough identities to create train data"<<endl;
+        }
+
+        if(val_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream>> files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/val_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //TRAIN TRACKLETS CREATION
+            cout<<"Validation tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int v_tracklets=0;
+            while(v_tracklets<max_v_tracklets){
+                for(int r=0; r<val_samples_matrix.size(); r++){
+                    vector<string> row=val_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        bool condition=true;
+
+                        //check id the identity have enough contiguous frames representations to create a tracklet
+                        for(int d=0; d<td; d++){
+                                if(val_samples_matrix[r][c-d].empty())
+                                    condition=false;
+                        }
+
+                        if(condition){//tracklet creation
+                            //for(int n=0; n<ts; n++){
+                                int n=0;
+                                if(v_tracklets<max_v_tracklets){
+                                    vector<string> positive_tracklet, negative_tracklet;
+                                    positive_tracklet.resize(td);
+                                    for(int d=1; d<td; d++){
+                                        positive_tracklet[d]=val_samples_matrix[r][c-d];
+                                    }
+                                    //add intruders
+                                    int intru=0;
+                                    while(intru<intruders){
+                                        int index=1+(rand() % (td-2));
+                                        int frame= rand() % (row.size()-1);
+                                        int intru_id=rand() % (val_samples_matrix.size()-1);
+                                        if(!val_samples_matrix[intru_id][frame].empty() && intru_id!=r){
+                                            positive_tracklet[index]=val_samples_matrix[intru_id][frame];
+                                            intru++;
+                                        }
+                                    }
+                                    //search the positive
+                                    bool positive_found=false;
+                                    if(c+n<row.size()){
+                                        if(!val_samples_matrix[r][c+n].empty())
+                                        {
+                                            positive_tracklet[0]=val_samples_matrix[r][c+n];
+                                            positive_found=true;
+                                        }
+                                    }
+                                    if(positive_found){
+                                        //search of the impostor
+                                        string impostor;
+                                        bool impostor_found=false;
+                                        int n_searches=0;
+                                        while(impostor_found==false && n_searches<1000){
+                                            int x=rand() % (val_samples_matrix.size()-1);
+                                            int f=rand() % (row.size()-1);
+                                            if(!val_samples_matrix[x][f].empty() && x!=r){
+                                                impostor=val_samples_matrix[x][f];
+                                                impostor_found=true;
+                                            }
+                                        }
+                                        if(impostor_found){
+                                            negative_tracklet=positive_tracklet;
+                                            negative_tracklet[0]=impostor;
+                                            tracklets_matrix.push_back(positive_tracklet);
+                                            v_tracklets++;
+                                            tracklets_matrix.push_back(negative_tracklet);
+                                            v_tracklets++;
+                                        }
+                                    }
+                                }
+                           // }
+
+                        }
+
+
+
+                    }
+                }
+            }
+
+            //random generation for val
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create val data"<<endl;
+        }
+
+        if(test_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream>> files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/test_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //TRAIN TRACKLETS CREATION
+            cout<<"Test tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int v_tracklets=0;
+            while(v_tracklets<max_ts_tracklets){
+                for(int r=0; r<test_samples_matrix.size(); r++){
+                    vector<string> row=test_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        bool condition=true;
+
+                        //check id the identity have enough contiguous frames representations to create a tracklet
+                        for(int d=0; d<td; d++){
+                                if(test_samples_matrix[r][c-d].empty())
+                                    condition=false;
+                        }
+
+                        if(condition){//tracklet creation
+                            //for(int n=0; n<ts; n++){
+                            int n=0;
+                                if(v_tracklets<max_ts_tracklets){
+                                    vector<string> positive_tracklet, negative_tracklet;
+                                    positive_tracklet.resize(td);
+                                    for(int d=1; d<td; d++){
+                                        positive_tracklet[d]=test_samples_matrix[r][c-d];
+                                    }
+                                    //add intruders
+                                    int intru=0;
+                                    while(intru<intruders){
+                                        int index=1+(rand() % (td-2));
+                                        int frame= rand() % (row.size()-1);
+                                        int intru_id=rand() % (test_samples_matrix.size()-1);
+                                        if(!test_samples_matrix[intru_id][frame].empty() && intru_id!=r){
+                                            positive_tracklet[index]=test_samples_matrix[intru_id][frame];
+                                            intru++;
+                                        }
+                                    }
+                                    //search the positive
+                                    bool positive_found=false;
+                                    if(c+n<row.size()){
+                                        if(!test_samples_matrix[r][c+n].empty())
+                                        {
+                                            positive_tracklet[0]=test_samples_matrix[r][c+n];
+                                            positive_found=true;
+                                        }
+                                    }
+                                    if(positive_found){
+                                        //search of the impostor
+                                        string impostor;
+                                        bool impostor_found=false;
+                                        int n_searches=0;
+                                        while(impostor_found==false && n_searches<1000){
+                                            int x=rand() % (test_samples_matrix.size()-1);
+                                            int f=rand() % (row.size()-1);
+                                            if(!test_samples_matrix[x][f].empty() && x!=r){
+                                                impostor=test_samples_matrix[x][f];
+                                                impostor_found=true;
+                                            }
+                                        }
+                                        if(impostor_found){
+                                            negative_tracklet=positive_tracklet;
+                                            negative_tracklet[0]=impostor;
+                                            tracklets_matrix.push_back(positive_tracklet);
+                                            v_tracklets++;
+                                            tracklets_matrix.push_back(negative_tracklet);
+                                            v_tracklets++;
+                                        }
+                                    }
+                                }
+                           // }
+
+                        }
+
+
+
+                    }
+                }
+            }
+
+            //random generation for test
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create test data"<<endl;
+        }
+
+    }else{
+        cout<<"  Not enough identities to create data"<<endl;
+    }
+
+}
+
+
+void create_occlusion_tracklet_data(string dataset_folder, int max_tr_tracklets, int max_v_tracklets, int max_ts_tracklets, int ts, int td, int steps_max, int oversampling, float training_identities_ratio, float val_identities_ratio){
+    srand (time(NULL));
+
+    //DATA FOLDER
+    char data_folder[150];
+    strcpy(data_folder, dataset_folder.c_str());
+    strcat(data_folder, "/DATA");
+    int e=mkdir(data_folder, ACCESSPERMS);
+
+    //DATA PAIRS FOLDER
+    char data_tracklet_folder[150];
+    strcpy(data_tracklet_folder, data_folder);
+    strcat(data_tracklet_folder, "/TRACKLET/OCCLUSION_TRACKLET");
+    int eT=mkdir(data_tracklet_folder, ACCESSPERMS);
+
+
+    //SAMPLES FOLDERS
+    char samples_folder[150], train_samples_folder[150];
+    strcpy(samples_folder, dataset_folder.c_str());
+    strcat(samples_folder, "/SAMPLES");
+    strcpy(train_samples_folder, samples_folder);
+    strcat(train_samples_folder, "/train");
+
+    //SAMPLES LIST FILE
+    char samples_list_file_name[150];
+    strcpy(samples_list_file_name, train_samples_folder);
+    strcat(samples_list_file_name, "/train_samples_list.txt");
+    ifstream samples_list_file(samples_list_file_name);
+    if (!samples_list_file.is_open())
+        cout<<"can not open "<<samples_list_file_name<<endl;
+
+    char samples_list_file_name_new[150];
+    strcpy(samples_list_file_name_new, data_folder);
+    strcat(samples_list_file_name_new, "/train_samples_list.txt");
+    ofstream samples_list_file_new(samples_list_file_name_new);
+    if (!samples_list_file_new.is_open())
+        cout<<"can not open "<<samples_list_file_name_new<<endl;
+
+    string line;
+    int max_id=0;
+    int previous_id=0;
+    int new_id=0;
+    int max_frame=0;
+    while ( std::getline (samples_list_file,line))//
+    {
+        std::stringstream ss;
+        ss.str(line);
+        std::vector<std::string> strs;
+        boost::split(strs, line, boost::is_any_of(","));
+        int frame=atoi(strs[2].c_str());
+        int id=atoi(strs[3].c_str());
+        if (id!=previous_id){
+            previous_id=id;
+            new_id++;
+        }
+        samples_list_file_new<<strs[0]<<","<<strs[1]<<","<<strs[2]<<", "<<new_id<<"\n";
+        if(new_id>max_id)
+            max_id=new_id;
+        if (frame>max_frame)
+            max_frame=frame;
+    }
+    samples_list_file.close();
+    samples_list_file_new.close();
+
+    if(max_id>1){
+        samples_list_file.open(samples_list_file_name_new);
+
+        //MATRIX WITH THE SAMPLES NAMES
+        vector<vector<string> > aux_samples_matrix, samples_matrix;
+        int height = max_id;
+        int width = max_frame;
+        aux_samples_matrix.resize(height);
+        for(int i = 0; i < height; i++) aux_samples_matrix[i].resize(width);
+        while ( std::getline (samples_list_file,line))
+        {
+            std::stringstream ss;
+            ss.str(line);
+            std::vector<std::string> strs;
+            boost::split(strs, line, boost::is_any_of(","));
+            int frame=atoi(strs[2].c_str());
+            int id=atoi(strs[3].c_str());
+            string label_a="0000";
+            stringstream s3;
+            s3 << id;
+            string idn = s3.str();
+            int size=idn.size();
+            label_a.replace(label_a.end()-size, label_a.end(), idn);
+            char sample[100];
+            strcpy(sample, strs[0].c_str());
+            strcat(sample, " ");
+            strcat(sample, label_a.c_str());
+            vector<string> row=aux_samples_matrix[id-1];
+            row[frame-1]=sample;
+            aux_samples_matrix[id-1]=row;
+        }
+
+        //random identitys order
+        int n_identities=aux_samples_matrix.size();
+        vector<int> random_index;
+        for(int t=0; t<n_identities; t++)
+            random_index.push_back(t);
+        std::random_shuffle ( random_index.begin(), random_index.end() );
+        for(int t=0; t<n_identities; t++){
+            //an, p, n
+            int index=random_index[t];
+            vector<string> row= aux_samples_matrix[index];
+            samples_matrix.push_back(row);
+        }
+
+        //TRAIN-VAL IDENTITIES DIVISION
+        cout<<"Train-val identities division..."<<endl;
+        vector<vector<string> > val_samples_matrix, train_samples_matrix, test_samples_matrix;
+        int train_size=0;
+        int val_size=0;
+        int test_size=0;
+        for(int r=0; r<samples_matrix.size(); r++){
+            vector<string> identity=samples_matrix[r];
+            if(!identity.empty()){
+                int id=r;
+                int grupos=max_id/100;
+                int rest=max_id%100;
+                //if(id!=189){
+                    if(id<grupos*100){
+                        if((id%100)< cvRound(training_identities_ratio*100.0)){//train
+                            train_samples_matrix.push_back(identity);
+                            train_size++;
+                        }else{//val
+                            if((id%100)< cvRound((training_identities_ratio+val_identities_ratio)*100.0)){
+                                val_samples_matrix.push_back(identity);
+                                val_size++;
+                            }else{//test
+                                test_samples_matrix.push_back(identity);
+                                test_size++;
+                            }
+                        }
+                    }else{
+                        if(float(float(id-grupos*100)/float(rest)) <= training_identities_ratio){//train
+                            train_samples_matrix.push_back(identity);
+                            train_size++;
+                        }else{//val
+                            if(float(float(id-grupos*100)/float(rest)) <= training_identities_ratio+val_identities_ratio){
+                                val_samples_matrix.push_back(identity);
+                                val_size++;
+                            }else{//test
+                                test_samples_matrix.push_back(identity);
+                                test_size++;
+                            }
+                        }
+                    }
+                //}
+
+            }
+        }
+
+        cout<< train_samples_matrix.size()<<" "<< val_samples_matrix.size()<<" "<<test_samples_matrix.size()<<" "<<max_id<<endl;
+
+        if(train_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream> > files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/train_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //TRAIN TRACKLETS CREATION
+            cout<<"Training tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int t_tracklets=0;
+            while(t_tracklets<max_tr_tracklets){
+                for(int r=0; r<train_samples_matrix.size(); r++){
+                    vector<string> row=train_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        if(t_tracklets<max_tr_tracklets){
+                            //exploro las posibilidades
+                            vector<string> positive_tracklet, negative_tracklet;
+                            positive_tracklet.resize(td);
+
+                            int found_samples=0;
+                            bool step;
+                            int steps=0;
+                            int step_size=0;
+                            for(int d=0; d<(row.size()-td); d++){
+                                if(steps<steps_max && step_size<ts && found_samples<td && (c-d)>0){
+                                    if(!train_samples_matrix[r][c-d].empty()){
+                                        step=false;
+                                        step_size=0;
+                                        positive_tracklet[found_samples]=train_samples_matrix[r][c-d];
+                                        found_samples++;
+                                    }else{
+                                        if (step_size==0){
+                                            steps++;
+                                        }
+                                        step=true;
+                                        step_size++;
+                                    }
+                                }
+                                /*cout<<steps<<endl;
+                                cout<<found_samples<<endl;
+                                cout<<step_size<<endl;
+                                cout<<endl;
+                                waitKey(100);*/
+                            }
+                            bool positive_found=(found_samples>=td) ? true : false;
+
+                            if(positive_found){
+                                //search of the impostor
+                                string impostor;
+                                bool impostor_found=false;
+                                int n_searches=0;
+                                while(impostor_found==false && n_searches<1000){
+                                    int x=rand() % (train_samples_matrix.size()-1);
+                                    int f=rand() % (row.size()-1);
+                                    if(!train_samples_matrix[x][f].empty() && x!=r){
+                                        impostor=train_samples_matrix[x][f];
+                                        impostor_found=true;
+                                    }
+                                }
+                                if(impostor_found){
+                                    negative_tracklet=positive_tracklet;
+                                    negative_tracklet[0]=impostor;
+                                    tracklets_matrix.push_back(positive_tracklet);
+                                    t_tracklets++;
+                                    tracklets_matrix.push_back(negative_tracklet);
+                                    t_tracklets++;
+                                }
+                            }
+
+
+                            if(steps==0&& t_tracklets%2==0){//añado saltos
+                                vector<int> steps_position;
+                                vector<int> steps_size;
+                                for(int i=0; i<steps_max; i++){
+                                    int x= rand() % (td-1);
+                                    int y= rand() % (ts-1);
+                                    bool contiguous=false;
+                                    for(int j=0; j<steps_position.size(); j++){
+                                        if (abs(x-steps_position[j])<=1)
+                                            contiguous=true;
+                                    }
+                                    if (!contiguous){
+                                        steps_position.push_back(x);
+                                        steps_size.push_back(y);
+                                    }
+                                }
+
+                                //crear positive tracklet with steps
+                                int found_samples=0;
+                                for(int d=0; d<(row.size()-td); d++){
+                                    if(found_samples<td){
+                                        bool is_step_position=false;
+                                        for(int j=0; j<steps_position.size(); j++){
+                                            if (found_samples==steps_position[j]){
+                                                is_step_position=true;
+                                                d=d+steps_size[j];
+                                            }
+                                        }
+                                        if((c-d)<row.size()){
+                                            if(!train_samples_matrix[r][c-d].empty()){
+                                                    positive_tracklet[found_samples]=train_samples_matrix[r][c-d];
+                                                    found_samples++;
+                                            }
+                                        }
+                                    }
+                                 }
+
+                                bool positive_found=(found_samples>=td) ? true : false;
+
+
+                                if(positive_found){
+                                    //search of the impostor
+                                    string impostor;
+                                    bool impostor_found=false;
+                                    int n_searches=0;
+                                    while(impostor_found==false && n_searches<1000){
+                                        int x=rand() % (train_samples_matrix.size()-1);
+                                        int f=rand() % (row.size()-1);
+                                        if(!train_samples_matrix[x][f].empty() && x!=r){
+                                            impostor=train_samples_matrix[x][f];
+                                            impostor_found=true;
+                                        }
+                                    }
+                                    if(impostor_found){
+                                        negative_tracklet=positive_tracklet;
+                                        negative_tracklet[0]=impostor;
+                                        tracklets_matrix.push_back(positive_tracklet);
+                                        t_tracklets++;
+                                        tracklets_matrix.push_back(negative_tracklet);
+                                        t_tracklets++;
+                                    }
+                                }
+
+
+                            }
+
+
+                        }
+                    }
+                }
+            }
+
+
+
+
+            //random generation for train
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create train data"<<endl;
+        }
+cout<<"train done"<<endl;
+        if(val_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream>> files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/val_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //val TRACKLETS CREATION
+            cout<<"Validation tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int t_tracklets=0;
+            while(t_tracklets<max_v_tracklets){
+                for(int r=0; r<val_samples_matrix.size(); r++){
+                    vector<string> row=val_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        if(t_tracklets<max_v_tracklets){
+                            //exploro las posibilidades
+                            vector<string> positive_tracklet, negative_tracklet;
+                            positive_tracklet.resize(td);
+
+                            int found_samples=0;
+                            bool step;
+                            int steps=0;
+                            int step_size=0;
+                            for(int d=0; d<(row.size()-td); d++){
+                                if(steps<steps_max && step_size<ts && found_samples<td && (c-d)>0){
+                                    if(!val_samples_matrix[r][c-d].empty()){
+                                        step=false;
+                                        step_size=0;
+                                        positive_tracklet[found_samples]=val_samples_matrix[r][c-d];
+                                        found_samples++;
+                                    }else{
+                                        if (step_size==0){
+                                            steps++;
+                                        }
+                                        step=true;
+                                        step_size++;
+                                    }
+                                }
+                            }
+                            bool positive_found=(found_samples>=td) ? true : false;
+
+                            if(positive_found){
+                                //search of the impostor
+                                string impostor;
+                                bool impostor_found=false;
+                                int n_searches=0;
+                                while(impostor_found==false && n_searches<1000){
+                                    int x=rand() % val_samples_matrix.size();
+                                    int f=rand() % row.size();
+                                    if(!val_samples_matrix[x][f].empty() && x!=r){
+                                        impostor=val_samples_matrix[x][f];
+                                        impostor_found=true;
+                                    }
+                                }
+                                if(impostor_found){
+                                    negative_tracklet=positive_tracklet;
+                                    negative_tracklet[0]=impostor;
+                                    tracklets_matrix.push_back(positive_tracklet);
+                                    t_tracklets++;
+                                    tracklets_matrix.push_back(negative_tracklet);
+                                    t_tracklets++;
+                                }
+                            }
+
+
+                            if(steps==0 && t_tracklets%2==0){//añado saltos
+                                vector<int> steps_position;
+                                vector<int> steps_size;
+                                for(int i=0; i<steps_max; i++){
+                                    int x= rand() % (td-1);
+                                    int y= rand() % (ts-1);
+                                    bool contiguous=false;
+                                    for(int j=0; j<steps_position.size(); j++){
+                                        if (abs(x-steps_position[j])<=1)
+                                            contiguous=true;
+                                    }
+                                    if (!contiguous){
+                                        steps_position.push_back(x);
+                                        steps_size.push_back(y);
+                                    }
+                                }
+
+                                //crear positive tracklet with steps
+                                int found_samples=0;
+                                for(int d=0; d<(row.size()-1); d++){
+                                    if(found_samples<td){
+                                        bool is_step_position=false;
+                                        for(int j=0; j<steps_position.size(); j++){
+                                            if (found_samples==steps_position[j]){
+                                                is_step_position=true;
+                                                d=d+steps_size[j];
+                                            }
+                                        }
+                                        if((c-d)<row.size()){
+                                            if(!val_samples_matrix[r][c-d].empty()){
+                                                    positive_tracklet[found_samples]=val_samples_matrix[r][c-d];
+                                                    found_samples++;
+                                            }
+                                        }
+                                    }
+                                 }bool positive_found=(found_samples>=td) ? true : false;
+
+                                if(positive_found){
+                                    //search of the impostor
+                                    string impostor;
+                                    bool impostor_found=false;
+                                    int n_searches=0;
+                                    while(impostor_found==false && n_searches<1000){
+                                        int x=rand() % val_samples_matrix.size();
+                                        int f=rand() % row.size();
+                                        if(!val_samples_matrix[x][f].empty() && x!=r){
+                                            impostor=val_samples_matrix[x][f];
+                                            impostor_found=true;
+                                        }
+                                    }
+                                    if(impostor_found){
+                                        negative_tracklet=positive_tracklet;
+                                        negative_tracklet[0]=impostor;
+                                        tracklets_matrix.push_back(positive_tracklet);
+                                        t_tracklets++;
+                                        tracklets_matrix.push_back(negative_tracklet);
+                                        t_tracklets++;
+                                    }
+                                }
+
+                            }
+
+
+                        }
+                    }
+                }
+            }
+
+
+
+            //random generation for val
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create val data"<<endl;
+        }
+cout<<"val done"<<endl;
+        if(test_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream>> files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/test_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //Test TRACKLETS CREATION
+            cout<<"Test tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int t_tracklets=0;
+            while(t_tracklets<max_ts_tracklets){
+                for(int r=0; r<test_samples_matrix.size(); r++){
+                    vector<string> row=test_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        if(t_tracklets<max_ts_tracklets){
+                            //exploro las posibilidades
+                            vector<string> positive_tracklet, negative_tracklet;
+                            positive_tracklet.resize(td);
+
+                            int found_samples=0;
+                            bool step;
+                            int steps=0;
+                            int step_size=0;
+                            for(int d=0; d<(row.size()-td); d++){
+                                if(steps<steps_max && step_size<ts && found_samples<td && (c-d)>0){
+                                    if(!test_samples_matrix[r][c-d].empty()){
+                                        step=false;
+                                        step_size=0;
+                                        positive_tracklet[found_samples]=test_samples_matrix[r][c-d];
+                                        found_samples++;
+                                    }else{
+                                        if (step_size==0){
+                                            steps++;
+                                        }
+                                        step=true;
+                                        step_size++;
+                                    }
+                                }
+                            }
+                            bool positive_found=(found_samples>=td) ? true : false;
+
+                            if(positive_found){
+                                //search of the impostor
+                                string impostor;
+                                bool impostor_found=false;
+                                int n_searches=0;
+                                while(impostor_found==false && n_searches<1000){
+                                    int x=rand() % (test_samples_matrix.size()-1);
+                                    int f=rand() % (row.size()-1);
+                                    if(!test_samples_matrix[x][f].empty() && x!=r){
+                                        impostor=test_samples_matrix[x][f];
+                                        impostor_found=true;
+                                    }
+                                }
+                                if(impostor_found){
+                                    negative_tracklet=positive_tracklet;
+                                    negative_tracklet[0]=impostor;
+                                    tracklets_matrix.push_back(positive_tracklet);
+                                    t_tracklets++;
+                                    tracklets_matrix.push_back(negative_tracklet);
+                                    t_tracklets++;
+                                }
+                            }
+
+
+                            if(steps==0 && t_tracklets%2==0){//añado saltos
+                                vector<int> steps_position;
+                                vector<int> steps_size;
+                                for(int i=0; i<steps_max; i++){
+                                    int x= rand() % (td-1);
+                                    int y= rand() % (ts-1);
+                                    bool contiguous=false;
+                                    for(int j=0; j<steps_position.size(); j++){
+                                        if (abs(x-steps_position[j])<=1)
+                                            contiguous=true;
+                                    }
+                                    if (!contiguous){
+                                        steps_position.push_back(x);
+                                        steps_size.push_back(y);
+                                    }
+                                }
+
+                                //crear positive tracklet with steps
+                                int found_samples=0;
+                                for(int d=0; d<(row.size()-td); d++){
+                                    if(found_samples<td){
+                                        bool is_step_position=false;
+                                        for(int j=0; j<steps_position.size(); j++){
+                                            if (found_samples==steps_position[j]){
+                                                is_step_position=true;
+                                                d=d+steps_size[j];
+                                            }
+                                        }
+                                        if((c-d)<row.size()){
+                                            if(!test_samples_matrix[r][c-d].empty()){
+                                                    positive_tracklet[found_samples]=test_samples_matrix[r][c-d];
+                                                    found_samples++;
+                                            }
+                                        }
+                                    }
+                                 }bool positive_found=(found_samples>=td) ? true : false;
+
+                                if(positive_found){
+                                    //search of the impostor
+                                    string impostor;
+                                    bool impostor_found=false;
+                                    int n_searches=0;
+                                    while(impostor_found==false && n_searches<1000){
+                                        int x=rand() % (test_samples_matrix.size()-1);
+                                        int f=rand() % (row.size()-1);
+                                        if(!test_samples_matrix[x][f].empty() && x!=r){
+                                            impostor=test_samples_matrix[x][f];
+                                            impostor_found=true;
+                                        }
+                                    }
+                                    if(impostor_found){
+                                        negative_tracklet=positive_tracklet;
+                                        negative_tracklet[0]=impostor;
+                                        tracklets_matrix.push_back(positive_tracklet);
+                                        t_tracklets++;
+                                        tracklets_matrix.push_back(negative_tracklet);
+                                        t_tracklets++;
+                                    }
+                                }
+
+
+                            }
+
+
+                        }
+                    }
+                }
+            }
+
+
+
+            //random generation for test
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create test data"<<endl;
+        }
+
+    }else{
+        cout<<"  Not enough identities to create data"<<endl;
+    }
+
+}
+
+
+
+void create_real_tracklet_data(string dataset_folder, int max_tr_tracklets, int max_v_tracklets, int max_ts_tracklets, int ts, int td, int steps_max, int intruders, int oversampling, float training_identities_ratio, float val_identities_ratio){
+    srand (time(NULL));
+
+    //DATA FOLDER
+    char data_folder[150];
+    strcpy(data_folder, dataset_folder.c_str());
+    strcat(data_folder, "/DATA");
+    int e=mkdir(data_folder, ACCESSPERMS);
+
+    //DATA PAIRS FOLDER
+    char data_tracklet_folder[150];
+    strcpy(data_tracklet_folder, data_folder);
+    strcat(data_tracklet_folder, "/TRACKLET/REAL_TRACKLET");
+    int eT=mkdir(data_tracklet_folder, ACCESSPERMS);
+
+
+    //SAMPLES FOLDERS
+    char samples_folder[150], train_samples_folder[150];
+    strcpy(samples_folder, dataset_folder.c_str());
+    strcat(samples_folder, "/SAMPLES");
+    strcpy(train_samples_folder, samples_folder);
+    strcat(train_samples_folder, "/train");
+
+    //SAMPLES LIST FILE
+    char samples_list_file_name[150];
+    strcpy(samples_list_file_name, train_samples_folder);
+    strcat(samples_list_file_name, "/train_samples_list.txt");
+    ifstream samples_list_file(samples_list_file_name);
+    if (!samples_list_file.is_open())
+        cout<<"can not open "<<samples_list_file_name<<endl;
+
+    char samples_list_file_name_new[150];
+    strcpy(samples_list_file_name_new, data_folder);
+    strcat(samples_list_file_name_new, "/train_samples_list.txt");
+    ofstream samples_list_file_new(samples_list_file_name_new);
+    if (!samples_list_file_new.is_open())
+        cout<<"can not open "<<samples_list_file_name_new<<endl;
+
+    string line;
+    int max_id=0;
+    int previous_id=0;
+    int new_id=0;
+    int max_frame=0;
+    while ( std::getline (samples_list_file,line))//
+    {
+        std::stringstream ss;
+        ss.str(line);
+        std::vector<std::string> strs;
+        boost::split(strs, line, boost::is_any_of(","));
+        int frame=atoi(strs[2].c_str());
+        int id=atoi(strs[3].c_str());
+        if (id!=previous_id){
+            previous_id=id;
+            new_id++;
+        }
+        samples_list_file_new<<strs[0]<<","<<strs[1]<<","<<strs[2]<<", "<<new_id<<"\n";
+        if(new_id>max_id)
+            max_id=new_id;
+        if (frame>max_frame)
+            max_frame=frame;
+    }
+    samples_list_file.close();
+    samples_list_file_new.close();
+
+    if(max_id>1){
+        samples_list_file.open(samples_list_file_name_new);
+
+        //MATRIX WITH THE SAMPLES NAMES
+        vector<vector<string> > aux_samples_matrix, samples_matrix;
+        int height = max_id;
+        int width = max_frame;
+        aux_samples_matrix.resize(height);
+        for(int i = 0; i < height; i++) aux_samples_matrix[i].resize(width);
+        while ( std::getline (samples_list_file,line))
+        {
+            std::stringstream ss;
+            ss.str(line);
+            std::vector<std::string> strs;
+            boost::split(strs, line, boost::is_any_of(","));
+            int frame=atoi(strs[2].c_str());
+            int id=atoi(strs[3].c_str());
+            string label_a="0000";
+            stringstream s3;
+            s3 << id;
+            string idn = s3.str();
+            int size=idn.size();
+            label_a.replace(label_a.end()-size, label_a.end(), idn);
+            char sample[100];
+            strcpy(sample, strs[0].c_str());
+            strcat(sample, " ");
+            strcat(sample, label_a.c_str());
+            vector<string> row=aux_samples_matrix[id-1];
+            row[frame-1]=sample;
+            aux_samples_matrix[id-1]=row;
+        }
+
+        //random identitys order
+        int n_identities=aux_samples_matrix.size();
+        vector<int> random_index;
+        for(int t=0; t<n_identities; t++)
+            random_index.push_back(t);
+        std::random_shuffle ( random_index.begin(), random_index.end() );
+        for(int t=0; t<n_identities; t++){
+            //an, p, n
+            int index=random_index[t];
+            vector<string> row= aux_samples_matrix[index];
+            samples_matrix.push_back(row);
+        }
+
+        //TRAIN-VAL IDENTITIES DIVISION
+        cout<<"Train-val identities division..."<<endl;
+        vector<vector<string> > val_samples_matrix, train_samples_matrix, test_samples_matrix;
+        int train_size=0;
+        int val_size=0;
+        int test_size=0;
+        for(int r=0; r<samples_matrix.size(); r++){
+            vector<string> identity=samples_matrix[r];
+            if(!identity.empty()){
+                int id=r;
+                int grupos=max_id/100;
+                int rest=max_id%100;
+                //if(id!=189){
+                    if(id<grupos*100){
+                        if((id%100)< cvRound(training_identities_ratio*100.0)){//train
+                            train_samples_matrix.push_back(identity);
+                            train_size++;
+                        }else{//val
+                            if((id%100)< cvRound((training_identities_ratio+val_identities_ratio)*100.0)){
+                                val_samples_matrix.push_back(identity);
+                                val_size++;
+                            }else{//test
+                                test_samples_matrix.push_back(identity);
+                                test_size++;
+                            }
+                        }
+                    }else{
+                        if(float(float(id-grupos*100)/float(rest)) <= training_identities_ratio){//train
+                            train_samples_matrix.push_back(identity);
+                            train_size++;
+                        }else{//val
+                            if(float(float(id-grupos*100)/float(rest)) <= training_identities_ratio+val_identities_ratio){
+                                val_samples_matrix.push_back(identity);
+                                val_size++;
+                            }else{//test
+                                test_samples_matrix.push_back(identity);
+                                test_size++;
+                            }
+                        }
+                    }
+                //}
+
+            }
+        }
+
+        cout<< train_samples_matrix.size()<<" "<< val_samples_matrix.size()<<" "<<test_samples_matrix.size()<<" "<<max_id<<endl;
+
+        if(train_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream> > files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/train_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //TRAIN TRACKLETS CREATION
+            cout<<"Training tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int t_tracklets=0;
+            while(t_tracklets<max_tr_tracklets){
+                for(int r=0; r<train_samples_matrix.size(); r++){
+                    vector<string> row=train_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        if(t_tracklets<max_tr_tracklets){
+                            //exploro las posibilidades
+                            vector<string> positive_tracklet, negative_tracklet;
+                            positive_tracklet.resize(td);
+
+                            int found_samples=0;
+                            bool step;
+                            int steps=0;
+                            int step_size=0;
+                            for(int d=0; d<(row.size()-td); d++){
+                                if(steps<steps_max && step_size<ts && found_samples<td && (c-d)>0){
+                                    if(!train_samples_matrix[r][c-d].empty()){
+                                        step=false;
+                                        step_size=0;
+                                        positive_tracklet[found_samples]=train_samples_matrix[r][c-d];
+                                        found_samples++;
+                                    }else{
+                                        if (step_size==0){
+                                            steps++;
+                                        }
+                                        step=true;
+                                        step_size++;
+                                    }
+                                }
+                            }
+                            bool positive_found=(found_samples>=td) ? true : false;
+
+                            if(positive_found){
+                                //add intruders
+                                int intru=0;
+                                while(intru<intruders){
+                                    int index=1+(rand() % (td-2));
+                                    int frame= rand() % (row.size()-1);
+                                    int intru_id=rand() % (train_samples_matrix.size()-1);
+                                    if(!train_samples_matrix[intru_id][frame].empty() && intru_id!=r){
+                                        positive_tracklet[index]=train_samples_matrix[intru_id][frame];
+                                        intru++;
+                                    }
+                                }
+
+                                //search of the impostor
+                                string impostor;
+                                bool impostor_found=false;
+                                int n_searches=0;
+                                while(impostor_found==false && n_searches<1000){
+                                    int x=rand() % (train_samples_matrix.size()-1);
+                                    int f=rand() % (row.size()-1);
+                                    if(!train_samples_matrix[x][f].empty() && x!=r){
+                                        impostor=train_samples_matrix[x][f];
+                                        impostor_found=true;
+                                    }
+                                }
+                                if(impostor_found){
+                                    negative_tracklet=positive_tracklet;
+                                    negative_tracklet[0]=impostor;
+                                    tracklets_matrix.push_back(positive_tracklet);
+                                    t_tracklets++;
+                                    tracklets_matrix.push_back(negative_tracklet);
+                                    t_tracklets++;
+                                }
+                            }
+
+
+                            if(steps==0&& t_tracklets%4==0){//añado saltos
+                                vector<int> steps_position;
+                                vector<int> steps_size;
+                                for(int i=0; i<steps_max; i++){
+                                    int x= rand() % (td-1);
+                                    int y= rand() % (ts-1);
+                                    bool contiguous=false;
+                                    for(int j=0; j<steps_position.size(); j++){
+                                        if (abs(x-steps_position[j])<=1)
+                                            contiguous=true;
+                                    }
+                                    if (!contiguous){
+                                        steps_position.push_back(x);
+                                        steps_size.push_back(y);
+                                    }
+                                }
+
+                                //crear positive tracklet with steps
+                                int found_samples=0;
+                                for(int d=0; d<(row.size()-td); d++){
+                                    if(found_samples<td){
+                                        bool is_step_position=false;
+                                        for(int j=0; j<steps_position.size(); j++){
+                                            if (found_samples==steps_position[j]){
+                                                is_step_position=true;
+                                                d=d+steps_size[j];
+                                            }
+                                        }
+                                        if((c-d)<row.size()){
+                                            if(!train_samples_matrix[r][c-d].empty()){
+                                                    positive_tracklet[found_samples]=train_samples_matrix[r][c-d];
+                                                    found_samples++;
+                                            }
+                                        }
+                                    }
+                                 }bool positive_found=(found_samples>=td) ? true : false;
+
+                                if(positive_found){
+                                    //add intruders
+                                    int intru=0;
+                                    while(intru<intruders){
+                                        int index=1+(rand() % (td-2));
+                                        int frame= rand() % (row.size()-1);
+                                        int intru_id=rand() % (train_samples_matrix.size()-1);
+                                        if(!train_samples_matrix[intru_id][frame].empty() && intru_id!=r){
+                                            positive_tracklet[index]=train_samples_matrix[intru_id][frame];
+                                            intru++;
+                                        }
+                                    }
+                                    //search of the impostor
+                                    string impostor;
+                                    bool impostor_found=false;
+                                    int n_searches=0;
+                                    while(impostor_found==false && n_searches<1000){
+                                        int x=rand() % (train_samples_matrix.size()-1);
+                                        int f=rand() % (row.size()-1);
+                                        if(!train_samples_matrix[x][f].empty() && x!=r){
+                                            impostor=train_samples_matrix[x][f];
+                                            impostor_found=true;
+                                        }
+                                    }
+                                    if(impostor_found){
+                                        negative_tracklet=positive_tracklet;
+                                        negative_tracklet[0]=impostor;
+                                        tracklets_matrix.push_back(positive_tracklet);
+                                        t_tracklets++;
+                                        tracklets_matrix.push_back(negative_tracklet);
+                                        t_tracklets++;
+                                    }
+                                }
+
+
+                            }
+
+
+                        }
+                    }
+                }
+            }
+
+            //random generation for train
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create train data"<<endl;
+        }
+
+        if(val_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream> > files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/val_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //val TRACKLETS CREATION
+            cout<<"Validation tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int t_tracklets=0;
+            while(t_tracklets<max_v_tracklets){
+                for(int r=0; r<val_samples_matrix.size(); r++){
+                    vector<string> row=val_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        if(t_tracklets<max_v_tracklets){
+                            //exploro las posibilidades
+                            vector<string> positive_tracklet, negative_tracklet;
+                            positive_tracklet.resize(td);
+
+                            int found_samples=0;
+                            bool step;
+                            int steps=0;
+                            int step_size=0;
+                            for(int d=0; d<(row.size()-td); d++){
+                                if(steps<steps_max && step_size<ts && found_samples<td && (c-d)>0){
+                                    if(!val_samples_matrix[r][c-d].empty()){
+                                        step=false;
+                                        step_size=0;
+                                        positive_tracklet[found_samples]=val_samples_matrix[r][c-d];
+                                        found_samples++;
+                                    }else{
+                                        if (step_size==0){
+                                            steps++;
+                                        }
+                                        step=true;
+                                        step_size++;
+                                    }
+                                }
+                            }
+                            bool positive_found=(found_samples>=td) ? true : false;
+
+                            if(positive_found){
+                                //add intruders
+                                int intru=0;
+                                while(intru<intruders){
+                                    int index=1+(rand() % (td-2));
+                                    int frame= rand() % (row.size()-1);
+                                    int intru_id=rand() % (val_samples_matrix.size()-1);
+                                    if(!val_samples_matrix[intru_id][frame].empty() && intru_id!=r){
+                                        positive_tracklet[index]=val_samples_matrix[intru_id][frame];
+                                        intru++;
+                                    }
+                                }
+
+                                //search of the impostor
+                                string impostor;
+                                bool impostor_found=false;
+                                int n_searches=0;
+                                while(impostor_found==false && n_searches<1000){
+                                    int x=rand() % (val_samples_matrix.size()-1);
+                                    int f=rand() % (row.size()-1);
+                                    if(!val_samples_matrix[x][f].empty() && x!=r){
+                                        impostor=val_samples_matrix[x][f];
+                                        impostor_found=true;
+                                    }
+                                }
+                                if(impostor_found){
+                                    negative_tracklet=positive_tracklet;
+                                    negative_tracklet[0]=impostor;
+                                    tracklets_matrix.push_back(positive_tracklet);
+                                    t_tracklets++;
+                                    tracklets_matrix.push_back(negative_tracklet);
+                                    t_tracklets++;
+                                }
+                            }
+
+
+                            if(steps==0&& t_tracklets%4==0){//añado saltos
+                                vector<int> steps_position;
+                                vector<int> steps_size;
+                                for(int i=0; i<steps_max; i++){
+                                    int x= rand() % (td-1);
+                                    int y= rand() % (ts-1);
+                                    bool contiguous=false;
+                                    for(int j=0; j<steps_position.size(); j++){
+                                        if (abs(x-steps_position[j])<=1)
+                                            contiguous=true;
+                                    }
+                                    if (!contiguous){
+                                        steps_position.push_back(x);
+                                        steps_size.push_back(y);
+                                    }
+                                }
+
+                                //crear positive tracklet with steps
+                                int found_samples=0;
+                                for(int d=0; d<(row.size()-td); d++){
+                                    if(found_samples<td){
+                                        bool is_step_position=false;
+                                        for(int j=0; j<steps_position.size(); j++){
+                                            if (found_samples==steps_position[j]){
+                                                is_step_position=true;
+                                                d=d+steps_size[j];
+                                            }
+                                        }
+                                        if((c-d)<row.size()){
+                                            if(!val_samples_matrix[r][c-d].empty()){
+                                                    positive_tracklet[found_samples]=val_samples_matrix[r][c-d];
+                                                    found_samples++;
+                                            }
+                                        }
+                                    }
+                                 }bool positive_found=(found_samples>=td) ? true : false;
+
+                                if(positive_found){
+                                    //add intruders
+                                    int intru=0;
+                                    while(intru<intruders){
+                                        int index=1+(rand() % (td-2));
+                                        int frame= rand() % (row.size()-1);
+                                        int intru_id=rand() % (val_samples_matrix.size()-1);
+                                        if(!val_samples_matrix[intru_id][frame].empty() && intru_id!=r){
+                                            positive_tracklet[index]=val_samples_matrix[intru_id][frame];
+                                            intru++;
+                                        }
+                                    }
+                                    //search of the impostor
+                                    string impostor;
+                                    bool impostor_found=false;
+                                    int n_searches=0;
+                                    while(impostor_found==false && n_searches<1000){
+                                        int x=rand() % (val_samples_matrix.size()-1);
+                                        int f=rand() % (row.size()-1);
+                                        if(!val_samples_matrix[x][f].empty() && x!=r){
+                                            impostor=val_samples_matrix[x][f];
+                                            impostor_found=true;
+                                        }
+                                    }
+                                    if(impostor_found){
+                                        negative_tracklet=positive_tracklet;
+                                        negative_tracklet[0]=impostor;
+                                        tracklets_matrix.push_back(positive_tracklet);
+                                        t_tracklets++;
+                                        tracklets_matrix.push_back(negative_tracklet);
+                                        t_tracklets++;
+                                    }
+                                }
+
+
+                            }
+
+
+                        }
+                    }
+                }
+            }
+
+            //random generation for val
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create val data"<<endl;
+        }
+
+        if(test_size>1){
+            //OPEN OUTPUT FILES
+            vector<shared_ptr<ofstream> > files;
+            for(int d=0; d<td; d++){
+                char file_name[150];
+                strcpy(file_name, data_tracklet_folder);
+                strcat(file_name, "/test_");
+                strcat(file_name, int2str(d).c_str());
+                strcat(file_name, ".txt");
+                files.push_back( make_shared<ofstream>( file_name ) );
+            }
+
+            //TEST TRACKLETS CREATION
+            cout<<"Test tracklets creation..."<<endl;
+            vector<vector<string>> tracklets_matrix;//tracklets_matrix, height=number of tracklets, width=tracklet depth
+            int t_tracklets=0;
+            while(t_tracklets<max_ts_tracklets){
+                for(int r=0; r<test_samples_matrix.size(); r++){
+                    vector<string> row=test_samples_matrix[r];//identity
+                    for(int c=td; c<row.size(); c=c+oversampling){
+                        if(t_tracklets<max_ts_tracklets){
+                            //exploro las posibilidades
+                            vector<string> positive_tracklet, negative_tracklet;
+                            positive_tracklet.resize(td);
+
+                            int found_samples=0;
+                            bool step;
+                            int steps=0;
+                            int step_size=0;
+                            for(int d=0; d<(row.size()-td); d++){
+                                if(steps<steps_max && step_size<ts && found_samples<td && (c-d)>0){
+                                    if(!test_samples_matrix[r][c-d].empty()){
+                                        step=false;
+                                        step_size=0;
+                                        positive_tracklet[found_samples]=test_samples_matrix[r][c-d];
+                                        found_samples++;
+                                    }else{
+                                        if (step_size==0){
+                                            steps++;
+                                        }
+                                        step=true;
+                                        step_size++;
+                                    }
+                                }
+                            }
+                            bool positive_found=(found_samples>=td) ? true : false;
+
+                            if(positive_found){
+                                //add intruders
+                                int intru=0;
+                                while(intru<intruders){
+                                    int index=1+(rand() % (td-2));
+                                    int frame= rand() % (row.size()-1);
+                                    int intru_id=rand() % (test_samples_matrix.size()-1);
+                                    if(!test_samples_matrix[intru_id][frame].empty() && intru_id!=r){
+                                        positive_tracklet[index]=test_samples_matrix[intru_id][frame];
+                                        intru++;
+                                    }
+                                }
+
+                                //search of the impostor
+                                string impostor;
+                                bool impostor_found=false;
+                                int n_searches=0;
+                                while(impostor_found==false && n_searches<1000){
+                                    int x=rand() % (test_samples_matrix.size()-1);
+                                    int f=rand() % (row.size()-1);
+                                    if(!test_samples_matrix[x][f].empty() && x!=r){
+                                        impostor=test_samples_matrix[x][f];
+                                        impostor_found=true;
+                                    }
+                                }
+                                if(impostor_found){
+                                    negative_tracklet=positive_tracklet;
+                                    negative_tracklet[0]=impostor;
+                                    tracklets_matrix.push_back(positive_tracklet);
+                                    t_tracklets++;
+                                    tracklets_matrix.push_back(negative_tracklet);
+                                    t_tracklets++;
+                                }
+                            }
+
+
+                            if(steps==0&& t_tracklets%4==0){//añado saltos
+                                vector<int> steps_position;
+                                vector<int> steps_size;
+                                for(int i=0; i<steps_max; i++){
+                                    int x= rand() % (td-1);
+                                    int y= rand() % (ts-1);
+                                    bool contiguous=false;
+                                    for(int j=0; j<steps_position.size(); j++){
+                                        if (abs(x-steps_position[j])<=1)
+                                            contiguous=true;
+                                    }
+                                    if (!contiguous){
+                                        steps_position.push_back(x);
+                                        steps_size.push_back(y);
+                                    }
+                                }
+
+                                //crear positive tracklet with steps
+                                int found_samples=0;
+                                for(int d=0; d<(row.size()-td); d++){
+                                    if(found_samples<td){
+                                        bool is_step_position=false;
+                                        for(int j=0; j<steps_position.size(); j++){
+                                            if (found_samples==steps_position[j]){
+                                                is_step_position=true;
+                                                d=d+steps_size[j];
+                                            }
+                                        }
+                                        if((c-d)<row.size()){
+                                            if(!test_samples_matrix[r][c-d].empty()){
+                                                    positive_tracklet[found_samples]=test_samples_matrix[r][c-d];
+                                                    found_samples++;
+                                            }
+                                        }
+                                    }
+                                 }bool positive_found=(found_samples>=td) ? true : false;
+
+                                if(positive_found){
+                                    //add intruders
+                                    int intru=0;
+                                    while(intru<intruders){
+                                        int index=1+(rand() % (td-2));
+                                        int frame= rand() % (row.size()-1);
+                                        int intru_id=rand() % (test_samples_matrix.size()-1);
+                                        if(!test_samples_matrix[intru_id][frame].empty() && intru_id!=r){
+                                            positive_tracklet[index]=test_samples_matrix[intru_id][frame];
+                                            intru++;
+                                        }
+                                    }
+                                    //search of the impostor
+                                    string impostor;
+                                    bool impostor_found=false;
+                                    int n_searches=0;
+                                    while(impostor_found==false && n_searches<1000){
+                                        int x=rand() % (test_samples_matrix.size()-1);
+                                        int f=rand() % (row.size()-1);
+                                        if(!test_samples_matrix[x][f].empty() && x!=r){
+                                            impostor=test_samples_matrix[x][f];
+                                            impostor_found=true;
+                                        }
+                                    }
+                                    if(impostor_found){
+                                        negative_tracklet=positive_tracklet;
+                                        negative_tracklet[0]=impostor;
+                                        tracklets_matrix.push_back(positive_tracklet);
+                                        t_tracklets++;
+                                        tracklets_matrix.push_back(negative_tracklet);
+                                        t_tracklets++;
+                                    }
+                                }
+
+
+                            }
+
+
+                        }
+                    }
+                }
+            }
+
+            //random generation for test
+            int n_tracklets=tracklets_matrix.size();
+            vector<int> random_index;
+            for(int t=0; t<n_tracklets; t++)
+                random_index.push_back(t);
+            std::random_shuffle ( random_index.begin(), random_index.end() );
+            for(int t=0; t<n_tracklets; t++){
+                for(int d=0; d<td; d++)
+                    *files[d]<<tracklets_matrix[random_index[t]][d]<<"\n";
+            }
+
+            //close OUTPUT FILES
+            for(int d=0; d<td; d++)
+                (*files[d]).close();
+
+        }else{
+            cout<<"     Not enough identities to create test data"<<endl;
+        }
+
+    }else{
+        cout<<"  Not enough identities to create data"<<endl;
+    }
+
+}
+
+
+
+
+
