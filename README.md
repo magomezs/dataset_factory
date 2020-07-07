@@ -41,6 +41,15 @@ Please cite dataset_factory_from_mot in your publications if it helps your resea
 }
 Gómez-Silva, M. J., Izquierdo, E., Escalera, A. D. L., & Armingol, J. M. (2019). Transferring learning from multi-person tracking to person re-identification. Integrated Computer-Aided Engineering, (Preprint), 1-16.
 
+Please cite triplet permutation method in your publications if it helps your research:
+@article{gomez2019triplet,
+  title={Triplet Permutation Method for Deep Learning of Single-Shot Person Re-Identification},
+  author={G{\'o}mez-Silva, Mar{\'\i}a Jos{\'e} and Armingol, Jose M and de la Escalera, Arturo},
+  year={2019},
+  publisher={IET}
+}
+M. J. Gómez-Silva, J. M. Armingol, and A. de la Escalera, “Triplet permutation method for deep learning of single-shot person re-identification,” 9th International Conference on Imaging for Crime Detection and Prevention (ICDP 2019), IET, 10-56, 2019
+
 
 # Example of how to use data_factory_from_reid
 This is an example of how to use data_factory_from_reid with PRID2011[1] and ViPER datasets[2].
